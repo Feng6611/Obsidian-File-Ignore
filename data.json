@@ -1,5 +1,5 @@
 {
-  "rules": "obsidian/",
+  "rules": "测试01.md\n测试02.md\ntest/\ntest03/",
   "debug": true,
   "lastModified": 1737285848387
 }

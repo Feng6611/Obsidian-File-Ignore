@@ -20,7 +20,7 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
-    display(): void {
+    async display(): Promise<void> {
         const { containerEl } = this;
         containerEl.empty();
 
@@ -123,14 +123,15 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
         const listEl = container.createDiv('matched-files');
 
         if (matchedFiles.length === 0) {
-            listEl.createEl('p', { text: '没有匹配的文件' });
+            listEl.createEl('p', { text: '没有匹配的项目' });
             return;
         }
 
         const ul = listEl.createEl('ul');
         matchedFiles.forEach(file => {
             const li = ul.createEl('li');
-            li.createEl('span', { text: file.path });
+            const displayPath = file.isDirectory ? file.path + '/' : file.path;
+            li.createEl('span', { text: displayPath });
         });
     }
 } 

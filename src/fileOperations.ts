@@ -1,5 +1,8 @@
-import { TAbstractFile, TFile, Vault } from 'obsidian';
+import { TAbstractFile, TFile, TFolder, Vault } from 'obsidian';
 import minimatch from 'minimatch';
+import { LocalFileSystem, FileInfo } from './localFileSystem';
+import path from 'path';
+import fs from 'fs';
 
 export interface FileOperation {
     oldPath: string;
@@ -14,12 +17,15 @@ export interface Rule {
 
 export class FileOperations {
     private vault: Vault;
+    private localFs: LocalFileSystem;
     private operations: FileOperation[] = [];
     private DEBUG = false;  // 默认关闭调试模式
     private rules: Rule[] = [];
 
     constructor(vault: Vault) {
         this.vault = vault;
+        // @ts-ignore
+        this.localFs = new LocalFileSystem(this.vault.adapter.getBasePath());
     }
 
     setDebug(enabled: boolean) {
@@ -47,22 +53,29 @@ export class FileOperations {
     }
 
     /**
+     * 递归获取所有文件，包括隐藏文件
+     */
+    private getAllFilesRecursively(currentPath: string = ''): FileInfo[] {
+        return this.localFs.getAllFiles(currentPath);
+    }
+
+    /**
      * 检查文件是否匹配规则（类似 .gitignore 规则）
      */
-    matchesRule(file: TFile, rule: Rule): boolean {
+    matchesRule(fileInfo: FileInfo, rule: Rule): boolean {
         // 统一使用正斜杠
-        const normalizedPath = file.path.replace(/\\/g, '/');
-
-        // 获取无点前缀的路径
-        const pathWithoutDot = normalizedPath.replace(/(.*\/)?\.+([^/]+)/, (match, folder, name) => {
-            return (folder ?? '') + name;
-        });
+        const normalizedPath = fileInfo.path.replace(/\\/g, '/');
 
         let pattern = rule.pattern;
 
         // 处理目录匹配（以 / 结尾）
         if (pattern.endsWith('/')) {
-            pattern = pattern + '**/*';
+            // 如果是目录匹配，且目标不是目录，直接返回 false
+            if (!fileInfo.isDirectory) {
+                return false;
+            }
+            // 不再添加 **/*，只匹配目录本身
+            pattern = pattern.slice(0, -1);
         }
 
         // 处理 ./ 开头的相对路径
@@ -75,12 +88,12 @@ export class FileOperations {
             pattern = pattern.slice(1);
         }
 
-        // 如果模式不包含 /，则匹配任意目录下的文件
+        // 如果模式不包含 /，则匹配任意目录下的文件/文件夹
         if (!pattern.includes('/')) {
             pattern = '**/' + pattern;
         }
 
-        // 使用 minimatch 进行 glob 匹配，同时检查原始路径和无点前缀的路径
+        // 使用 minimatch 进行 glob 匹配
         const matchOptions = {
             dot: true,           // 匹配点文件
             nocase: true,        // 忽略大小写
@@ -88,96 +101,153 @@ export class FileOperations {
             noglobstar: false    // 启用 ** 匹配
         };
 
-        return minimatch(normalizedPath, pattern, matchOptions) ||
-            minimatch(pathWithoutDot, pattern, matchOptions);
+        this.debug(`检查匹配 - 路径: ${normalizedPath}, 是否为目录: ${fileInfo.isDirectory}, 规则: ${pattern}`);
+
+        return minimatch(normalizedPath, pattern, matchOptions);
     }
 
     /**
      * 获取需要处理的文件列表
      */
-    async getFilesToProcess(rules: string[]): Promise<TFile[]> {
-        if (!Array.isArray(rules) || rules.length === 0) {
-            return [];
+    async getFilesToProcess(rules: string[]): Promise<FileInfo[]> {
+        // 获取所有文件和文件夹
+        const allFiles = this.getAllFilesRecursively();
+
+        // 调试输出所有找到的文件和文件夹
+        if (this.DEBUG) {
+            this.debug('所有文件和文件夹:', allFiles.map(f => `${f.path}${f.isDirectory ? '/' : ''}`));
         }
 
-        const files = this.vault.getFiles();
-
-        // 将规则转换为 Rule 对象
-        const parsedRules = rules.map(rule => ({
-            pattern: rule.startsWith('!') ? rule.slice(1) : rule,
-            negate: rule.startsWith('!')
-        }));
-
-        // 对每个文件进行匹配（按照 .gitignore 规则）
-        const matchedFiles = files.filter(file => {
-            let shouldInclude = false;
-
-            for (const rule of parsedRules) {
-                const matches = this.matchesRule(file, rule);
-
-                if (rule.negate) {
-                    // 如果是排除规则（!pattern）且匹配，则排除该文件
-                    if (matches) {
-                        return false;
+        const matchedItems = allFiles.filter(fileInfo => {
+            return rules.some(rule => {
+                // 创建匹配模式
+                const createPatterns = (pattern: string): string[] => {
+                    // 如果模式已经以点开头，只返回原模式
+                    if (pattern.startsWith('.')) {
+                        return [pattern];
                     }
-                } else {
-                    // 如果是包含规则且匹配，标记为应该包含
-                    if (matches) {
-                        shouldInclude = true;
+                    // 否则返回原模式和带点版本
+                    return [pattern, '.' + pattern];
+                };
+
+                // 如果规则以 / 结尾，匹配目录本身和带点前缀的目录
+                if (rule.endsWith('/')) {
+                    const basePattern = rule.slice(0, -1);
+                    const patterns = createPatterns(basePattern);
+
+                    // 只匹配目录，且必须匹配其中一个模式
+                    const matched = fileInfo.isDirectory && patterns.some(pattern =>
+                        minimatch(fileInfo.path, pattern, {
+                            dot: true,
+                            nocase: true,
+                            matchBase: false,
+                            noglobstar: false
+                        })
+                    );
+
+                    if (matched && this.DEBUG) {
+                        this.debug(`目录匹配成功 - 路径: ${fileInfo.path}/, 规则: ${rule}`);
                     }
+                    return matched;
                 }
-            }
 
-            return shouldInclude;
+                // 处理文件匹配
+                // 如果模式不包含 /，则匹配任意目录下的文件
+                const patterns = createPatterns(rule).map(pattern =>
+                    !pattern.includes('/') ? '**/' + pattern : pattern
+                );
+
+                // 匹配文件
+                const matched = !fileInfo.isDirectory && patterns.some(pattern =>
+                    minimatch(fileInfo.path, pattern, {
+                        dot: true,
+                        nocase: true,
+                        matchBase: false,
+                        noglobstar: false
+                    })
+                );
+
+                if (matched && this.DEBUG) {
+                    this.debug(`文件匹配成功 - 路径: ${fileInfo.path}, 规则: ${rule}`);
+                }
+                return matched;
+            });
         });
 
         if (this.DEBUG) {
-            this.debug(`匹配结果: ${matchedFiles.length} 个文件:`,
-                matchedFiles.map(f => f.path));
+            this.debug(`匹配结果: ${matchedItems.length} 个项目:`,
+                matchedItems.map(f => `${f.path}${f.isDirectory ? '/' : ''}`));
         }
 
-        return matchedFiles;
+        return matchedItems;
     }
 
     /**
      * 添加或移除点前缀
-     * @param file 要处理的文件
-     * @param isAdd 为 true 时添加点前缀,为 false 时移除点前缀
      */
-    public async addDotPrefix(file: TFile, isAdd: boolean = true): Promise<void> {
+    public async addDotPrefix(fileInfo: FileInfo, isAdd: boolean = true): Promise<void> {
         let newPath: string;
+        const displayPath = fileInfo.isDirectory ? fileInfo.path + '/' : fileInfo.path;
 
         if (isAdd) {
-            if (file.name.startsWith('.')) {
-                this.debug(`文件 ${file.path} 已包含点前缀，跳过`);
+            if (fileInfo.name.startsWith('.')) {
+                this.debug(`${fileInfo.isDirectory ? '文件夹' : '文件'} ${displayPath} 已包含点前缀，跳过`);
                 return;
             }
 
-            newPath = file.path.replace(/(.*\/)?([^/]+)/, (match, folder, name) => {
+            newPath = fileInfo.path.replace(/(.*\/)?([^/]+)/, (match, folder, name) => {
                 return (folder ?? '') + '.' + name;
             });
 
-            this.debug(`添加点前缀: ${file.path} -> ${newPath}`);
-            await this.vault.rename(file, newPath);
+            this.debug(`添加点前缀: ${displayPath} -> ${newPath}${fileInfo.isDirectory ? '/' : ''}`);
         } else {
-            if (!file.name.startsWith('.')) {
-                this.debug(`文件 ${file.path} 不含点前缀，跳过`);
+            if (!fileInfo.name.startsWith('.')) {
+                this.debug(`${fileInfo.isDirectory ? '文件夹' : '文件'} ${displayPath} 不含点前缀，跳过`);
                 return;
             }
 
-            newPath = file.path.replace(/(.*\/)?\.+([^/]+)/, (match, folder, name) => {
+            newPath = fileInfo.path.replace(/(.*\/)?\.+([^/]+)/, (match, folder, name) => {
                 return (folder ?? '') + name;
             });
 
-            this.debug(`移除点前缀: ${file.path} -> ${newPath}`);
-            await this.vault.rename(file, newPath);
+            this.debug(`移除点前缀: ${displayPath} -> ${newPath}${fileInfo.isDirectory ? '/' : ''}`);
         }
 
-        this.operations.push({
-            oldPath: file.path,
-            newPath: newPath,
-            timestamp: Date.now()
-        });
+        try {
+            // 使用 LocalFileSystem 获取完整路径
+            const oldFullPath = this.localFs.getFullPath(fileInfo.path);
+            const newFullPath = this.localFs.getFullPath(newPath);
+
+            // 检查源文件是否存在
+            if (!fs.existsSync(oldFullPath)) {
+                throw new Error(`找不到文件: ${fileInfo.path}`);
+            }
+
+            // 检查目标路径是否已存在
+            if (fs.existsSync(newFullPath)) {
+                throw new Error(`目标文件已存在: ${newPath}`);
+            }
+
+            // 执行重命名操作
+            fs.renameSync(oldFullPath, newFullPath);
+
+            // 如果是非隐藏文件，也通过 Obsidian API 重命名以保持同步
+            if (!fileInfo.path.startsWith('.') && !newPath.startsWith('.')) {
+                const abstractFile = this.vault.getAbstractFileByPath(fileInfo.path);
+                if (abstractFile) {
+                    await this.vault.rename(abstractFile, newPath);
+                }
+            }
+
+            this.operations.push({
+                oldPath: fileInfo.path,
+                newPath: newPath,
+                timestamp: Date.now()
+            });
+        } catch (error) {
+            this.debug('重命名失败:', error);
+            throw error;
+        }
     }
 
     /**
@@ -202,12 +272,35 @@ export class FileOperations {
 
         for (const op of lastBatch.operations.reverse()) {
             this.debug('Rolling back operation:', op);
-            const file = this.vault.getAbstractFileByPath(op.newPath);
-            if (file instanceof TFile) {
-                await this.vault.rename(file, op.oldPath);
+            try {
+                const oldFullPath = this.localFs.getFullPath(op.oldPath);
+                const newFullPath = this.localFs.getFullPath(op.newPath);
+
+                // 检查源文件是否存在
+                if (!fs.existsSync(newFullPath)) {
+                    throw new Error(`找不到文件: ${op.newPath}`);
+                }
+
+                // 检查目标路径是否已存在
+                if (fs.existsSync(oldFullPath)) {
+                    throw new Error(`目标文件已存在: ${op.oldPath}`);
+                }
+
+                // 执行重命名操作
+                fs.renameSync(newFullPath, oldFullPath);
+
+                // 如果是非隐藏文件，也通过 Obsidian API 重命名以保持同步
+                if (!op.newPath.startsWith('.') && !op.oldPath.startsWith('.')) {
+                    const abstractFile = this.vault.getAbstractFileByPath(op.newPath);
+                    if (abstractFile) {
+                        await this.vault.rename(abstractFile, op.oldPath);
+                    }
+                }
+
                 this.debug('Successfully rolled back:', op.newPath, 'to', op.oldPath);
-            } else {
-                this.debug('File not found for rollback:', op.newPath);
+            } catch (error) {
+                this.debug('Failed to rollback:', op.newPath, error);
+                throw error;
             }
         }
 
@@ -220,8 +313,22 @@ export class FileOperations {
      * 获取当前隐藏的文件列表
      */
     getHiddenFiles(): TFile[] {
-        const hiddenFiles = this.vault.getFiles().filter(file => file.path.startsWith('.'));
+        const allFiles = this.getAllFilesRecursively();
+        const hiddenFiles = allFiles
+            .filter(file => !file.isDirectory && file.name.startsWith('.'))
+            .map(fileInfo => this.vault.getAbstractFileByPath(fileInfo.path))
+            .filter((file): file is TFile => file instanceof TFile);
+
         this.debug('Current hidden files:', hiddenFiles.map(f => f.path));
         return hiddenFiles;
+    }
+
+    /**
+     * 获取用于显示的路径（文件夹添加/后缀）
+     */
+    public getDisplayPath(fileOrPath: TAbstractFile | string, isFolder?: boolean): string {
+        const path = typeof fileOrPath === 'string' ? fileOrPath : fileOrPath.path;
+        const shouldAddSlash = isFolder ?? (fileOrPath instanceof TFolder);
+        return shouldAddSlash ? path + '/' : path;
     }
 } 
