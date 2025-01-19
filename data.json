@@ -1,5 +1,5 @@
 {
-  "rules": "测试01.md\n测试02.md\ntest/\ntest03/",
+  "rules": "node_modules/\nsrc/",
   "debug": true,
   "lastModified": 1737285848387
 }
