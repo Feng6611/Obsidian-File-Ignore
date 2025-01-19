@@ -1,0 +1,1 @@
+# Obsidianignore
