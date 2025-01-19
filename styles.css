@@ -1,0 +1,33 @@
+.hidden-files-list {
+    margin-top: 1em;
+}
+
+.hidden-files-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.hidden-files-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5em;
+    margin: 0.25em 0;
+    background-color: var(--background-secondary);
+    border-radius: 4px;
+}
+
+.hidden-files-list button {
+    margin-left: 1em;
+    padding: 0.25em 0.5em;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.hidden-files-list button:hover {
+    background-color: var(--interactive-accent-hover);
+} 

@@ -1,0 +1,25 @@
+.obsidian/
+.DS_Store
+*.log
+node_modules/
+package-lock.json
+yarn.lock
+
+# 构建输出
+main.js
+*.js.map
+
+# IDE 配置
+.vscode/
+.idea/
+
+# 测试覆盖率报告
+coverage/
+
+# 临时文件
+*.tmp
+*~
+
+# 环境变量
+.env
+.env.local

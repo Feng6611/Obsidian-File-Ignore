@@ -1,0 +1,10 @@
+{
+    "id": "obsidianignore",
+    "name": "ObsidianIgnore",
+    "version": "1.0.0",
+    "minAppVersion": "0.15.0",
+    "description": "Control file indexing by adding/removing dot prefix, similar to .gitignore",
+    "author": "",
+    "authorUrl": "",
+    "isDesktopOnly": false
+} 
