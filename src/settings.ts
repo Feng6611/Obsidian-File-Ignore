@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting, TextAreaComponent, ButtonComponent, Notice } from 'obsidian';
 import type ObsidianIgnore from './main';
+import { locales, type Translation } from './i18n/locales';
 
 export interface ObsidianIgnoreSettings {
     rules: string;  // 保持为字符串类型，存储原始文本
@@ -14,10 +15,33 @@ export const DEFAULT_SETTINGS: ObsidianIgnoreSettings = {
 export class ObsidianIgnoreSettingTab extends PluginSettingTab {
     plugin: ObsidianIgnore;
     rulesTextArea: TextAreaComponent;
+    t: Translation;
 
     constructor(app: App, plugin: ObsidianIgnore) {
         super(app, plugin);
         this.plugin = plugin;
+        // 获取 Obsidian 当前语言设置
+        const locale = (window as any).localStorage.getItem('language') || 'en';
+        // 根据语言代码选择对应的翻译
+        if (locale.startsWith('zh')) {
+            // 检查是否为繁体中文
+            if (locale === 'zh-TW' || locale === 'zh-HK') {
+                this.t = locales['zh-TW'];
+            } else {
+                // 其他中文默认使用简体中文
+                this.t = locales['zh-CN'];
+            }
+        } else if (locale === 'ja') {
+            this.t = locales.ja;
+        } else {
+            // 默认使用英文
+            this.t = locales.en;
+        }
+
+        // 调试用：打印当前使用的语言
+        if (this.plugin.settings.debug) {
+            console.log('[ObsidianIgnore] Current locale:', locale);
+        }
     }
 
     async display(): Promise<void> {
@@ -25,51 +49,51 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         // 标题
-        containerEl.createEl('h2', { text: 'ObsidianIgnore 设置' });
+        containerEl.createEl('h2', { text: this.t.settingsTitle });
 
         // 1. 应用规则按钮
         new Setting(containerEl)
-            .setName('应用规则')
-            .setDesc('为匹配的文件添加点前缀，使其在 Obsidian 中隐藏')
+            .setName(this.t.applyRules.name)
+            .setDesc(this.t.applyRules.desc)
             .addButton(button => button
-                .setButtonText('应用规则')
+                .setButtonText(this.t.applyRules.button)
                 .onClick(async () => {
                     try {
                         if (!this.plugin.fileOps) {
-                            throw new Error('FileOperations 未初始化');
+                            throw new Error('FileOperations not initialized');
                         }
                         await this.plugin.applyRules(true);
-                        new Notice('规则已应用');
+                        new Notice(this.t.applyRules.success);
                     } catch (err) {
-                        console.error('[ObsidianIgnore] 应用规则时出错:', err);
-                        new Notice('应用规则时出错: ' + err.message);
+                        console.error('[ObsidianIgnore]', err);
+                        new Notice(this.t.applyRules.error + err.message);
                     }
                     await this.updateMatchedFiles();
                 }));
 
         // 2. 撤销规则按钮
         new Setting(containerEl)
-            .setName('撤销规则')
-            .setDesc('为匹配的文件移除点前缀，使其在 Obsidian 中显示')
+            .setName(this.t.revertRules.name)
+            .setDesc(this.t.revertRules.desc)
             .addButton(button => button
-                .setButtonText('撤销规则')
+                .setButtonText(this.t.revertRules.button)
                 .onClick(async () => {
                     try {
                         if (!this.plugin.fileOps) {
-                            throw new Error('FileOperations 未初始化');
+                            throw new Error('FileOperations not initialized');
                         }
                         await this.plugin.applyRules(false);
-                        new Notice('规则已撤销');
+                        new Notice(this.t.revertRules.success);
                     } catch (err) {
-                        console.error('[ObsidianIgnore] 撤销规则时出错:', err);
-                        new Notice('撤销规则时出错: ' + err.message);
+                        console.error('[ObsidianIgnore]', err);
+                        new Notice(this.t.revertRules.error + err.message);
                     }
                     await this.updateMatchedFiles();
                 }));
 
         // 3. 忽略规则设置
         new Setting(containerEl)
-            .setName('忽略规则')
+            .setName(this.t.ignoreRules.title)
             .setHeading();
 
         // 创建主容器
@@ -90,17 +114,12 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
         rulesDescContainer.style.marginBottom = '12px';
 
         const descContainer = rulesDescContainer.createDiv('setting-item-description');
-        descContainer.createSpan({ text: '支持的规则格式（每行一条）:' });
+        descContainer.createSpan({ text: this.t.ignoreRules.formatTitle });
         const formatList = descContainer.createDiv();
         formatList.style.marginTop = '8px';
         formatList.style.marginLeft = '8px';
 
-        [
-            '具体文件：test.md',
-            '文件类型：*.pdf',
-            '排除规则：!docs/*.pdf',
-            '文件夹：temp/'
-        ].forEach(text => {
+        this.t.ignoreRules.formats.forEach(text => {
             const item = formatList.createDiv();
             item.style.marginBottom = '4px';
             item.createSpan({ text: '• ' + text });
@@ -156,7 +175,7 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
         titleContainer.style.padding = '12px';
         titleContainer.style.backgroundColor = 'var(--background-modifier-form-field)';
         titleContainer.createEl('p', {
-            text: '当前匹配的文件',
+            text: this.t.ignoreRules.matchedFiles,
             cls: 'setting-item-name'
         }).style.margin = '0';
 
@@ -167,27 +186,32 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
         filesListContainer.style.flex = '1';
         filesListContainer.style.backgroundColor = 'var(--background-modifier-form-field)';
 
-        this.createMatchedFilesList(filesListContainer);
+        // 初始化时更新匹配文件列表
+        await this.updateMatchedFiles();
     }
 
     private async updateMatchedFiles() {
-        const matchedFilesEl = this.containerEl.querySelector('.matched-files');
-        if (matchedFilesEl instanceof HTMLElement && matchedFilesEl.parentElement instanceof HTMLElement) {
-            matchedFilesEl.empty();
-            await this.createMatchedFilesList(matchedFilesEl.parentElement);
+        const filesListContainer = this.containerEl.querySelector('.matched-files-list-container');
+        if (filesListContainer instanceof HTMLElement) {
+            await this.createMatchedFilesList(filesListContainer);
         }
     }
 
     private async createMatchedFilesList(container: HTMLElement) {
-        const rules = this.plugin.settings.rules.split('\n')
+        // 清空现有内容
+        container.empty();
+
+        // 确保使用当前的规则进行匹配
+        const currentRules = this.plugin.settings.rules.split('\n')
             .map(line => line.trim())
             .filter(line => line && !line.startsWith('#'));
-        const matchedFiles = await this.plugin.fileOps.getFilesToProcess(rules);
+
+        const matchedFiles = await this.plugin.fileOps.getFilesToProcess(currentRules);
         const listEl = container.createDiv('matched-files');
 
         if (matchedFiles.length === 0) {
             const noMatchesEl = listEl.createEl('p', {
-                text: '没有匹配的项目',
+                text: this.t.ignoreRules.noMatches,
                 cls: 'setting-item-description'
             });
             noMatchesEl.style.textAlign = 'center';

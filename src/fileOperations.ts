@@ -86,6 +86,16 @@ export class FileOperations {
         // 处理绝对路径（以 / 开头）
         if (pattern.startsWith('/')) {
             pattern = pattern.slice(1);
+            // 对于绝对路径，直接进行完整路径匹配
+            const matchOptions = {
+                dot: true,           // 匹配点文件
+                nocase: true,        // 忽略大小写
+                matchBase: false,    // 使用完整路径匹配
+                noglobstar: false    // 启用 ** 匹配
+            };
+
+            this.debug(`检查绝对路径匹配 - 路径: ${normalizedPath}, 规则: ${pattern}`);
+            return minimatch(normalizedPath, pattern, matchOptions);
         }
 
         // 如果模式不包含 /，则匹配任意目录下的文件/文件夹
@@ -120,6 +130,22 @@ export class FileOperations {
 
         const matchedItems = allFiles.filter(fileInfo => {
             return rules.some(rule => {
+                // 如果是绝对路径规则（以 / 开头）
+                if (rule.startsWith('/')) {
+                    const pattern = rule.slice(1);
+                    const matched = minimatch(fileInfo.path, pattern, {
+                        dot: true,
+                        nocase: true,
+                        matchBase: false,
+                        noglobstar: false
+                    });
+
+                    if (matched && this.DEBUG) {
+                        this.debug(`绝对路径匹配成功 - 路径: ${fileInfo.path}, 规则: ${rule}`);
+                    }
+                    return matched;
+                }
+
                 // 创建匹配模式
                 const createPatterns = (pattern: string): string[] => {
                     // 如果模式已经以点开头，只返回原模式
@@ -135,8 +161,16 @@ export class FileOperations {
                     const basePattern = rule.slice(0, -1);
                     const patterns = createPatterns(basePattern);
 
+                    // 如果模式包含通配符但不是绝对路径，添加 **/ 前缀以匹配任意层级
+                    const finalPatterns = patterns.map(pattern => {
+                        if (pattern.includes('*') && !pattern.startsWith('/')) {
+                            return '**/' + pattern;
+                        }
+                        return pattern;
+                    });
+
                     // 只匹配目录，且必须匹配其中一个模式
-                    const matched = fileInfo.isDirectory && patterns.some(pattern =>
+                    const matched = fileInfo.isDirectory && finalPatterns.some(pattern =>
                         minimatch(fileInfo.path, pattern, {
                             dot: true,
                             nocase: true,
@@ -152,10 +186,13 @@ export class FileOperations {
                 }
 
                 // 处理文件匹配
-                // 如果模式不包含 /，则匹配任意目录下的文件
-                const patterns = createPatterns(rule).map(pattern =>
-                    !pattern.includes('/') ? '**/' + pattern : pattern
-                );
+                // 如果模式包含通配符但不是绝对路径，添加 **/ 前缀以匹配任意层级
+                const patterns = createPatterns(rule).map(pattern => {
+                    if ((pattern.includes('*') || !pattern.includes('/')) && !pattern.startsWith('/')) {
+                        return '**/' + pattern;
+                    }
+                    return pattern;
+                });
 
                 // 匹配文件
                 const matched = !fileInfo.isDirectory && patterns.some(pattern =>

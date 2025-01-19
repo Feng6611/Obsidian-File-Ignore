@@ -1,5 +1,5 @@
 {
-  "rules": "node_modules/\nsrc/",
+  "rules": "node_modules/\nsrc/\nscripts/\ntest03/test04/test05.md\n*test04/\n/readme.md\n\n",
   "debug": true,
   "lastModified": 1737285848387
 }
