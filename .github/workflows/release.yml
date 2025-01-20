@@ -34,9 +34,14 @@ jobs:
         run: |
           tag="${GITHUB_REF#refs/tags/}"
           
+          # 检查版本号是否匹配
+          manifest_version=$(cat manifest.json | jq -r '.version')
+          if [ "$tag" != "$manifest_version" ]; then
+            echo "Error: Tag version ($tag) does not match manifest.json version ($manifest_version)"
+            exit 1
+          fi
+          
           gh release create "$tag" \
             --title="$tag" \
             --draft \
-            "main.js" \
-            "manifest.json" \
-            "styles.css" 
+            main.js manifest.json styles.css 
