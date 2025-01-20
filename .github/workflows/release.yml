@@ -28,7 +28,7 @@ jobs:
           npm install
           npm run build
 
-      - name: Create Release
+      - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -44,4 +44,4 @@ jobs:
           gh release create "$tag" \
             --title="$tag" \
             --draft \
-            main.js manifest.json styles.css 
+            main.js manifest.json styles.css versions.json 
