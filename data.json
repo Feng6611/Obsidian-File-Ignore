@@ -1,5 +1,4 @@
 {
-  "rules": "node_modules/\nsrc/\nscripts/\ntest03/test04/test05.md\n*test04/\n/readme.md\n\n",
-  "debug": true,
-  "lastModified": 1737285848387
+  "rules": "node_modules/\nsrc/\n/test05.md\ntest03/test03.md\n",
+  "debug": true
 }

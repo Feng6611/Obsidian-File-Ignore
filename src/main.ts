@@ -15,14 +15,11 @@ export default class ObsidianIgnore extends Plugin {
             await this.loadSettings();
             console.log('[ObsidianIgnore] 设置加载完成:', this.settings);
 
-            // 初始化 FileOperations
+            // 获取 vault 根目录路径
+            const basePath = (this.app.vault.adapter as any).getBasePath();
             this.fileOps = new FileOperations(this.app.vault);
-            this.fileOps.setDebug(this.settings.debug);
-            console.log('[ObsidianIgnore] FileOperations 初始化完成');
-
-            // 初始化本地文件系统
-            const basePath = this.app.vault.adapter.getBasePath();
             this.localFs = new LocalFileSystem(basePath);
+            console.log('[ObsidianIgnore] FileOperations 初始化完成');
             console.log('[ObsidianIgnore] LocalFileSystem 初始化完成, 根目录:', basePath);
 
             // 添加设置标签页
@@ -100,20 +97,6 @@ export default class ObsidianIgnore extends Plugin {
                                 });
                         });
                     }
-                })
-            );
-
-            // 将搜索函数包装在防抖函数中，延迟5000毫秒（5秒）
-            const debouncedSearch = debounce(async (query: string) => {
-                // 执行您的搜索/匹配逻辑
-                // ... 
-            }, 5000);
-
-            // 在需要执行搜索的地方调用 debouncedSearch
-            // 例如：
-            this.registerEvent(
-                this.app.workspace.on('file-open', () => {
-                    debouncedSearch(/* 您的搜索参数 */);
                 })
             );
         } catch (error) {

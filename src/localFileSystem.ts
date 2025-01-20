@@ -24,7 +24,7 @@ export class LocalFileSystem {
         const fullPath = path.join(this.basePath, relativePath);
         try {
             // 修改 readdirSync 选项，包含隐藏文件
-            const items = fs.readdirSync(fullPath, { withFileTypes: true, recursive: false });
+            const items = fs.readdirSync(fullPath, { withFileTypes: true });
             return items.map(item => {
                 const itemPath = path.join(relativePath, item.name);
                 return {

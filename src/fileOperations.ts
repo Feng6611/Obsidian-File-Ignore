@@ -3,6 +3,7 @@ import minimatch from 'minimatch';
 import { LocalFileSystem, FileInfo } from './localFileSystem';
 import path from 'path';
 import fs from 'fs';
+import { debounce } from './utils/debounce';
 
 export interface FileOperation {
     oldPath: string;
@@ -21,11 +22,17 @@ export class FileOperations {
     private operations: FileOperation[] = [];
     private DEBUG = false;  // 默认关闭调试模式
     private rules: Rule[] = [];
+    private debouncedGetFilesToProcess: (rules: string[]) => Promise<FileInfo[]>;
 
     constructor(vault: Vault) {
         this.vault = vault;
         // @ts-ignore
         this.localFs = new LocalFileSystem(this.vault.adapter.getBasePath());
+        // 初始化防抖函数，设置 1.5s 延迟
+        this.debouncedGetFilesToProcess = debounce(
+            async (rules: string[]) => this._getFilesToProcess(rules),
+            1500
+        );
     }
 
     setDebug(enabled: boolean) {
@@ -117,28 +124,41 @@ export class FileOperations {
     }
 
     /**
-     * 获取需要处理的文件列表
+     * 获取需要处理的文件列表（带防抖的公共方法）
      */
     async getFilesToProcess(rules: string[]): Promise<FileInfo[]> {
+        return this.debouncedGetFilesToProcess(rules);
+    }
+
+    /**
+     * 实际的文件处理逻辑（私有方法）
+     */
+    private async _getFilesToProcess(rules: string[]): Promise<FileInfo[]> {
         // 获取所有文件和文件夹
         const allFiles = this.getAllFilesRecursively();
-
-        // 调试输出所有找到的文件和文件夹
-        if (this.DEBUG) {
-            this.debug('所有文件和文件夹:', allFiles.map(f => `${f.path}${f.isDirectory ? '/' : ''}`));
-        }
 
         const matchedItems = allFiles.filter(fileInfo => {
             return rules.some(rule => {
                 // 如果是绝对路径规则（以 / 开头）
                 if (rule.startsWith('/')) {
                     const pattern = rule.slice(1);
-                    const matched = minimatch(fileInfo.path, pattern, {
+                    // 创建两个模式：原始模式和带点前缀的模式
+                    const patterns = [pattern];
+
+                    // 如果模式不包含路径分隔符，或者最后一个分隔符后的部分不以点开头
+                    const lastSlashIndex = pattern.lastIndexOf('/');
+                    const fileName = lastSlashIndex === -1 ? pattern : pattern.slice(lastSlashIndex + 1);
+                    if (!fileName.startsWith('.')) {
+                        const dirPath = lastSlashIndex === -1 ? '' : pattern.slice(0, lastSlashIndex + 1);
+                        patterns.push(dirPath + '.' + fileName);
+                    }
+
+                    const matched = patterns.some(p => minimatch(fileInfo.path, p, {
                         dot: true,
                         nocase: true,
                         matchBase: false,
                         noglobstar: false
-                    });
+                    }));
 
                     if (matched && this.DEBUG) {
                         this.debug(`绝对路径匹配成功 - 路径: ${fileInfo.path}, 规则: ${rule}`);

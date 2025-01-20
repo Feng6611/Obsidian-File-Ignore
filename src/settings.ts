@@ -1,6 +1,7 @@
 import { App, PluginSettingTab, Setting, TextAreaComponent, ButtonComponent, Notice } from 'obsidian';
 import type ObsidianIgnore from './main';
 import { locales, type Translation } from './i18n/locales';
+import { debounce } from './utils/debounce';
 
 export interface ObsidianIgnoreSettings {
     rules: string;  // 保持为字符串类型，存储原始文本
@@ -16,6 +17,7 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
     plugin: ObsidianIgnore;
     rulesTextArea: TextAreaComponent;
     t: Translation;
+    private debouncedUpdateMatchedFiles: () => Promise<void>;
 
     constructor(app: App, plugin: ObsidianIgnore) {
         super(app, plugin);
@@ -38,10 +40,36 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
             this.t = locales.en;
         }
 
+        // 初始化防抖函数，设置 1.5s 延迟
+        this.debouncedUpdateMatchedFiles = debounce(
+            async () => {
+                await this.updateMatchedFilesImpl();
+            },
+            1500
+        );
+
         // 调试用：打印当前使用的语言
         if (this.plugin.settings.debug) {
             console.log('[ObsidianIgnore] Current locale:', locale);
         }
+    }
+
+    // 立即更新匹配文件列表的方法
+    private async updateMatchedFilesImpl() {
+        const filesListContainer = this.containerEl.querySelector('.matched-files-list-container');
+        if (filesListContainer instanceof HTMLElement) {
+            await this.createMatchedFilesList(filesListContainer);
+        }
+    }
+
+    // 用于防抖更新的方法
+    private async updateMatchedFiles() {
+        await this.debouncedUpdateMatchedFiles();
+    }
+
+    // 用于立即更新的方法
+    private async updateMatchedFilesImmediate() {
+        await this.updateMatchedFilesImpl();
     }
 
     async display(): Promise<void> {
@@ -136,13 +164,24 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
         textAreaContainer.style.overflow = 'hidden';
 
         // 规则输入框
-        this.rulesTextArea = new TextAreaComponent(textAreaContainer)
-            .setValue(this.plugin.settings.rules || 'node_modules/\nsrc/')
-            .onChange(async (value) => {
-                this.plugin.settings.rules = value;
-                await this.plugin.saveSettings();
+        this.rulesTextArea = new TextAreaComponent(textAreaContainer);
+
+        // 先设置值，此时还没有注册 onChange 事件，不会触发更新
+        this.rulesTextArea.setValue(this.plugin.settings.rules || 'node_modules/\nsrc/');
+
+        // 然后注册 onChange 事件
+        this.rulesTextArea.onChange(async (value) => {
+            const isResettingToDefault = value === DEFAULT_SETTINGS.rules;
+            this.plugin.settings.rules = value;
+            await this.plugin.saveSettings();
+
+            // 如果是重置到默认值，立即更新
+            if (isResettingToDefault) {
+                await this.updateMatchedFilesImmediate();
+            } else {
                 await this.updateMatchedFiles();
-            });
+            }
+        });
 
         const textAreaEl = this.rulesTextArea.inputEl;
         textAreaEl.style.width = '100%';
@@ -186,15 +225,8 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
         filesListContainer.style.flex = '1';
         filesListContainer.style.backgroundColor = 'var(--background-modifier-form-field)';
 
-        // 初始化时更新匹配文件列表
-        await this.updateMatchedFiles();
-    }
-
-    private async updateMatchedFiles() {
-        const filesListContainer = this.containerEl.querySelector('.matched-files-list-container');
-        if (filesListContainer instanceof HTMLElement) {
-            await this.createMatchedFilesList(filesListContainer);
-        }
+        // 初始化时立即更新匹配文件列表
+        await this.updateMatchedFilesImmediate();
     }
 
     private async createMatchedFilesList(container: HTMLElement) {
