@@ -1,4 +1,0 @@
-{
-  "rules": "node_modules/\nsrc/\n/test05.md\ntest03/test03.md\n",
-  "debug": true
-}
