@@ -34,28 +34,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Current ref: $GITHUB_REF"
           tag="${GITHUB_REF#refs/tags/}"
-          echo "Extracted tag: $tag"
           
           # 检查版本号是否匹配
           manifest_version=$(cat manifest.json | jq -r '.version')
-          echo "Manifest version: $manifest_version"
           
           if [ "$tag" != "$manifest_version" ]; then
             echo "Error: Tag version ($tag) does not match manifest.json version ($manifest_version)"
             exit 1
           fi
           
-          # 检查文件是否存在
-          for file in main.js manifest.json styles.css versions.json; do
-            if [ ! -f "$file" ]; then
-              echo "Error: Required file $file does not exist"
-              exit 1
-            fi
-          done
+          # 创建发布包
+          mkdir ${{ env.PLUGIN_NAME }}
+          cp main.js manifest.json styles.css versions.json ${{ env.PLUGIN_NAME }}
+          zip -r ${{ env.PLUGIN_NAME }}.zip ${{ env.PLUGIN_NAME }}
           
           gh release create "$tag" \
-            --title="$tag" \
             --draft \
-            main.js manifest.json styles.css versions.json 
+            --title="$tag" \
+            --notes "Release $tag" \
+            main.js manifest.json styles.css versions.json "${{ env.PLUGIN_NAME }}.zip" 
