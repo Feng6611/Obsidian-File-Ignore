@@ -1,7 +1,7 @@
 {
-  "name": "obsidianignore",
+  "name": "file-ignore",
   "version": "1.0.0",
-  "description": "An Obsidian plugin to control file indexing by adding/removing dot prefix",
+  "description": "Control Obsidian's file indexing by adding or removing dot prefix to files, providing a .gitignore-like experience",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
@@ -12,7 +12,7 @@
   "keywords": [
     "obsidian-plugin"
   ],
-  "author": "",
+  "author": "Chen",
   "license": "MIT",
   "devDependencies": {
     "@codemirror/state": "6.2.0",

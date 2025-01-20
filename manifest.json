@@ -1,10 +1,10 @@
 {
-    "id": "obsidianignore",
-    "name": "ObsidianIgnore",
+    "id": "file-ignore",
+    "name": "File Ignore",
     "version": "1.0.0",
     "minAppVersion": "0.15.0",
-    "description": "Control file indexing by adding/removing dot prefix, similar to .gitignore",
-    "author": "",
-    "authorUrl": "",
+    "description": "Control Obsidian's file indexing by adding or removing dot prefix to files, providing a .gitignore-like experience",
+    "author": "Chen",
+    "authorUrl": "https://github.com/feng6611",
     "isDesktopOnly": false
 } 
