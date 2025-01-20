@@ -41,7 +41,7 @@ export class FileOperations {
 
     private debug(...args: any[]) {
         if (this.DEBUG) {
-            console.log('[ObsidianIgnore]', ...args);
+            console.log('[file-ignore]', ...args);
         }
     }
 

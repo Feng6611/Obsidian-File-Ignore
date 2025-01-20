@@ -28,130 +28,130 @@ export interface Translation {
 }
 
 export const en: Translation = {
-    settingsTitle: 'ObsidianIgnore Settings',
+    settingsTitle: 'File Ignore Settings',
     applyRules: {
-        name: 'Apply Rules',
-        desc: 'Add dot prefix to matched files to hide them in Obsidian',
-        button: 'Apply Rules',
-        success: 'Rules applied',
-        error: 'Error applying rules: ',
+        name: 'Hide Files',
+        desc: 'Add dot prefix to hide matched files',
+        button: 'Hide Files',
+        success: 'Files hidden successfully',
+        error: 'Failed to hide files: ',
     },
     revertRules: {
-        name: 'Revert Rules',
-        desc: 'Remove dot prefix from matched files to show them in Obsidian',
-        button: 'Revert Rules',
-        success: 'Rules reverted',
-        error: 'Error reverting rules: ',
+        name: 'Show Files',
+        desc: 'Remove dot prefix to show matched files',
+        button: 'Show Files',
+        success: 'Files shown successfully',
+        error: 'Failed to show files: ',
     },
     ignoreRules: {
         title: 'Ignore Rules',
-        formatTitle: 'Supported rule formats (one per line):',
+        formatTitle: 'Rule Format (one per line):',
         formats: [
-            'All files: test.md',
-            'Absolute path: /readme.md (root directory only)',
+            'File pattern: test.md',
+            'Root path: /readme.md',
             'Directory: temp/',
-            'Wildcard directory: *test/'
+            'Wildcard: *test/'
         ],
-        noMatches: 'No matches found',
-        matchedFiles: 'Currently Matched Files',
+        noMatches: 'No matching files',
+        matchedFiles: 'Matched Files',
     },
 };
 
 export const zhCN: Translation = {
-    settingsTitle: 'ObsidianIgnore 设置',
+    settingsTitle: 'File Ignore 设置',
     applyRules: {
-        name: '应用规则',
-        desc: '为匹配的文件添加点前缀，使其在 Obsidian 中隐藏',
-        button: '应用规则',
-        success: '规则已应用',
-        error: '应用规则时出错：',
+        name: '隐藏文件',
+        desc: '为匹配的文件添加点前缀以隐藏',
+        button: '隐藏文件',
+        success: '文件已隐藏',
+        error: '隐藏文件失败：',
     },
     revertRules: {
-        name: '撤销规则',
-        desc: '为匹配的文件移除点前缀，使其在 Obsidian 中显示',
-        button: '撤销规则',
-        success: '规则已撤销',
-        error: '撤销规则时出错：',
+        name: '显示文件',
+        desc: '移除匹配文件的点前缀以显示',
+        button: '显示文件',
+        success: '文件已显示',
+        error: '显示文件失败：',
     },
     ignoreRules: {
         title: '忽略规则',
-        formatTitle: '支持的规则格式（每行一条）：',
+        formatTitle: '规则格式（每行一条）：',
         formats: [
-            '全部文件：test.md',
-            '绝对路径：/readme.md（只匹配根目录）',
+            '文件名：test.md',
+            '根目录：/readme.md',
             '文件夹：temp/',
-            '通配符目录：*test/'
+            '通配符：*test/'
         ],
-        noMatches: '没有匹配的项目',
-        matchedFiles: '当前匹配的文件',
+        noMatches: '无匹配文件',
+        matchedFiles: '匹配的文件',
     },
 };
 
 export const zhTW: Translation = {
-    settingsTitle: 'ObsidianIgnore 設定',
+    settingsTitle: 'File Ignore 設定',
     applyRules: {
-        name: '套用規則',
-        desc: '為符合的檔案添加點字首，使其在 Obsidian 中隱藏',
-        button: '套用規則',
-        success: '規則已套用',
-        error: '套用規則時發生錯誤：',
+        name: '隱藏檔案',
+        desc: '為符合的檔案加入點字首以隱藏',
+        button: '隱藏檔案',
+        success: '檔案已隱藏',
+        error: '隱藏檔案失敗：',
     },
     revertRules: {
-        name: '還原規則',
-        desc: '為符合的檔案移除點字首，使其在 Obsidian 中顯示',
-        button: '還原規則',
-        success: '規則已還原',
-        error: '還原規則時發生錯誤：',
+        name: '顯示檔案',
+        desc: '移除符合檔案的點字首以顯示',
+        button: '顯示檔案',
+        success: '檔案已顯示',
+        error: '顯示檔案失敗：',
     },
     ignoreRules: {
         title: '忽略規則',
-        formatTitle: '支援的規則格式（每行一條）：',
+        formatTitle: '規則格式（每行一條）：',
         formats: [
-            '全部檔案：test.md',
-            '絕對路徑：/readme.md（僅匹配根目錄）',
+            '檔案模式：test.md',
+            '根目錄：/readme.md',
             '資料夾：temp/',
-            '萬用字元目錄：*test/'
+            '萬用字元：*test/'
         ],
-        noMatches: '沒有符合的項目',
-        matchedFiles: '目前符合的檔案',
+        noMatches: '無符合檔案',
+        matchedFiles: '符合的檔案',
     },
 };
 
 export const ja: Translation = {
-    settingsTitle: 'ObsidianIgnore 設定',
+    settingsTitle: 'File Ignore 設定',
     applyRules: {
-        name: 'ルールを適用',
-        desc: 'マッチしたファイルにドットプレフィックスを追加してObsidianで非表示にする',
-        button: 'ルールを適用',
-        success: 'ルールが適用されました',
-        error: 'ルールの適用中にエラーが発生しました：',
+        name: 'ファイルを隠す',
+        desc: 'マッチしたファイルにドット接頭辞を追加して隠す',
+        button: '隠す',
+        success: 'ファイルを隠しました',
+        error: 'ファイルを隠せませんでした：',
     },
     revertRules: {
-        name: 'ルールを元に戻す',
-        desc: 'マッチしたファイルからドットプレフィックスを削除してObsidianで表示する',
-        button: 'ルールを元に戻す',
-        success: 'ルールが元に戻されました',
-        error: 'ルールの復元中にエラーが発生しました：',
+        name: 'ファイルを表示',
+        desc: 'マッチしたファイルのドット接頭辞を削除して表示',
+        button: '表示',
+        success: 'ファイルを表示しました',
+        error: 'ファイルを表示できませんでした：',
     },
     ignoreRules: {
         title: '無視ルール',
-        formatTitle: 'サポートされているルール形式（1行につき1つ）：',
+        formatTitle: 'ルール形式（1行に1つ）：',
         formats: [
-            'すべてのファイル：test.md',
-            '絶対パス：/readme.md（ルートディレクトリのみ）',
+            'ファイル：test.md',
+            'ルート：/readme.md',
             'フォルダ：temp/',
-            'ワイルドカードディレクトリ：*test/'
+            'ワイルドカード：*test/'
         ],
-        noMatches: '一致するものがありません',
-        matchedFiles: '現在マッチしているファイル',
+        noMatches: '一致するファイルがありません',
+        matchedFiles: '一致したファイル',
     },
 };
 
-export const locales = {
-    en,
+export const locales: Record<string, Translation> = {
+    'en': en,
     'zh-CN': zhCN,
     'zh-TW': zhTW,
-    ja,
+    'ja': ja,
 };
 
 export type LocaleKey = keyof typeof locales; 

@@ -50,7 +50,7 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
 
         // 调试用：打印当前使用的语言
         if (this.plugin.settings.debug) {
-            console.log('[ObsidianIgnore] Current locale:', locale);
+            console.log('[file-ignore] Current locale:', locale);
         }
     }
 
@@ -93,7 +93,7 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
                         await this.plugin.applyRules(true);
                         new Notice(this.t.applyRules.success);
                     } catch (err) {
-                        console.error('[ObsidianIgnore]', err);
+                        console.error('[file-ignore]', err);
                         new Notice(this.t.applyRules.error + err.message);
                     }
                     await this.updateMatchedFiles();
@@ -113,7 +113,7 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
                         await this.plugin.applyRules(false);
                         new Notice(this.t.revertRules.success);
                     } catch (err) {
-                        console.error('[ObsidianIgnore]', err);
+                        console.error('[file-ignore]', err);
                         new Notice(this.t.revertRules.error + err.message);
                     }
                     await this.updateMatchedFiles();
@@ -232,6 +232,16 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
     private async createMatchedFilesList(container: HTMLElement) {
         // 清空现有内容
         container.empty();
+
+        if (!this.plugin.fileOps) {
+            const errorEl = container.createEl('p', {
+                text: 'FileOperations 未初始化',
+                cls: 'setting-item-description'
+            });
+            errorEl.style.textAlign = 'center';
+            errorEl.style.margin = '0';
+            return;
+        }
 
         // 确保使用当前的规则进行匹配
         const currentRules = this.plugin.settings.rules.split('\n')

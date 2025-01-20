@@ -1,39 +1,47 @@
-# File Ignore
+# 📁 File Ignore
 
-Control Obsidian's file indexing by adding or removing dot prefix to files, providing a .gitignore-like experience.
+An Obsidian plugin that controls file indexing by managing dot prefixes (hidden attributes), providing a .gitignore-like experience.
 
-## Features
+English | [简体中文](README-zh.md)
 
-- 🎯 Selectively exclude files from Obsidian's indexing by adding a dot prefix
-- 🔄 Easily toggle file indexing status through a simple interface
-- 🚀 Fast and reliable with local file system operations
-- ⚙️ User-friendly settings panel for managing files
+## 💡 Background
 
-## Installation
+When using Obsidian to manage repositories with numerous files (like Next.js projects), you might encounter these issues:
 
-1. Open Obsidian Settings
-2. Go to Community Plugins and disable Safe Mode
-3. Click Browse and search for "File Ignore"
-4. Install and enable the plugin
+- Obsidian indexes all files (including node_modules), resulting in extremely slow startup
+- Lack of file filtering mechanism similar to .gitignore
+- Manual management of hidden files is tedious and error-prone
 
-## Usage
+This plugin leverages Obsidian's default behavior of not indexing "dot-prefixed hidden files" to provide a simple file filtering solution. Tests show startup time improvement from 10s to near-instant.
 
-1. Open Settings and navigate to the File Ignore section
-2. Browse your files in the list
-3. Click the toggle button to add/remove dot prefix
-4. Changes take effect immediately in Obsidian's indexing
+![Settings Page](setting.png)
 
-## Tips
+## ⚡️ Usage
 
-- Files with dot prefix (e.g. `.example.md`) will be excluded from Obsidian's search and graph view
-- The original file content remains unchanged
-- Consider backing up important files before modifying their names
-- You can always revert the changes by removing the dot prefix
+### Matching Rules
 
-## Support
+Supports the following matching patterns:
 
-If you encounter any issues or have suggestions, please visit our [GitHub repository](https://github.com/feng6611/file-ignore).
+- Specific file: `test.md`
+- Root directory file: `/readme.md`
+- Entire folder: `temp/`
+- Wildcard matching: `*test/`
 
-## License
+### Operations
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+The plugin provides two core functions:
+
+- "Hide Files": Add a "." prefix to matched files, setting them as hidden
+- "Show Files": Remove the "." prefix from matched files, restoring them as normal files
+
+### 🔍 Tips
+
+Recommended to use with the [Show-Hide-Files](https://github.com/polyipseity/obsidian-show-hidden-files) plugin for better hidden file management.
+
+## 🤝 Support
+
+If you encounter any issues or have suggestions for improvements, please visit our [GitHub repository](https://github.com/feng6611/file-ignore) to create an issue.
+
+## 📄 License
+
+This project is open-sourced under the MIT License - see the [LICENSE](LICENSE) file for details.

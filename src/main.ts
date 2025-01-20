@@ -6,21 +6,21 @@ import { debounce } from './utils/debounce';
 
 export default class ObsidianIgnore extends Plugin {
     settings: ObsidianIgnoreSettings;
-    fileOps: FileOperations;
-    localFs: LocalFileSystem;
+    fileOps: FileOperations | undefined;
+    localFs: LocalFileSystem | undefined;
 
     async onload() {
-        console.log('[ObsidianIgnore] 插件开始加载...');
+        console.log('[file-ignore] 插件开始加载...');
         try {
             await this.loadSettings();
-            console.log('[ObsidianIgnore] 设置加载完成:', this.settings);
+            console.log('[file-ignore] 设置加载完成:', this.settings);
 
             // 获取 vault 根目录路径
             const basePath = (this.app.vault.adapter as any).getBasePath();
             this.fileOps = new FileOperations(this.app.vault);
             this.localFs = new LocalFileSystem(basePath);
-            console.log('[ObsidianIgnore] FileOperations 初始化完成');
-            console.log('[ObsidianIgnore] LocalFileSystem 初始化完成, 根目录:', basePath);
+            console.log('[file-ignore] FileOperations 初始化完成');
+            console.log('[file-ignore] LocalFileSystem 初始化完成, 根目录:', basePath);
 
             // 添加设置标签页
             this.addSettingTab(new ObsidianIgnoreSettingTab(this.app, this));
@@ -100,12 +100,22 @@ export default class ObsidianIgnore extends Plugin {
                 })
             );
         } catch (error) {
-            console.error('[ObsidianIgnore] 插件加载出错:', error);
+            console.error('[file-ignore] 插件加载出错:', error);
         }
     }
 
     onunload() {
         // 清理工作
+        console.log('[file-ignore] 插件正在卸载...');
+        // 清理文件操作实例
+        if (this.fileOps) {
+            this.fileOps = undefined;
+        }
+        // 清理本地文件系统实例
+        if (this.localFs) {
+            this.localFs = undefined;
+        }
+        console.log('[file-ignore] 插件卸载完成');
     }
 
     async loadSettings() {
@@ -118,16 +128,18 @@ export default class ObsidianIgnore extends Plugin {
             this.fileOps.setDebug(this.settings.debug);
         }
         // 触发设置更新
-        this.app.workspace.trigger('obsidianignore:settings-update');
+        this.app.workspace.trigger('file-ignore:settings-update');
     }
 
     // 文件操作方法
     async addDotPrefix(file: TFile | TFolder) {
         try {
-            const fileInfo = this.localFs.getFileInfo(file.path);
-            await this.fileOps.addDotPrefix(fileInfo, true);
-            new Notice(`${file instanceof TFolder ? '文件夹' : '文件'}已隐藏`);
-            this.app.workspace.requestSaveLayout();
+            const fileInfo = this.localFs?.getFileInfo(file.path);
+            if (fileInfo) {
+                await this.fileOps?.addDotPrefix(fileInfo, true);
+                new Notice(`${file instanceof TFolder ? '文件夹' : '文件'}已隐藏`);
+                this.app.workspace.requestSaveLayout();
+            }
         } catch (error) {
             console.error('隐藏失败:', error);
             new Notice('隐藏失败');
@@ -136,10 +148,12 @@ export default class ObsidianIgnore extends Plugin {
 
     async removeDotPrefix(file: TFile | TFolder) {
         try {
-            const fileInfo = this.localFs.getFileInfo(file.path);
-            await this.fileOps.addDotPrefix(fileInfo, false);
-            new Notice(`${file instanceof TFolder ? '文件夹' : '文件'}已显示`);
-            this.app.workspace.requestSaveLayout();
+            const fileInfo = this.localFs?.getFileInfo(file.path);
+            if (fileInfo) {
+                await this.fileOps?.addDotPrefix(fileInfo, false);
+                new Notice(`${file instanceof TFolder ? '文件夹' : '文件'}已显示`);
+                this.app.workspace.requestSaveLayout();
+            }
         } catch (error) {
             console.error('显示失败:', error);
             new Notice('显示失败');
@@ -165,7 +179,7 @@ export default class ObsidianIgnore extends Plugin {
             const files = await this.fileOps.getFilesToProcess(rules);
 
             // 只输出匹配结果
-            console.log('[ObsidianIgnore] 匹配到的文件:',
+            console.log('[file-ignore] 匹配到的文件:',
                 files.map(f => f.isDirectory ? f.path + '/' : f.path));
 
             if (files.length === 0) {
@@ -181,7 +195,7 @@ export default class ObsidianIgnore extends Plugin {
             // 请求 Obsidian 刷新文件列表
             this.app.workspace.requestSaveLayout();
         } catch (error) {
-            console.error('[ObsidianIgnore] 应用规则时出错:', error);
+            console.error('[file-ignore] 应用规则时出错:', error);
             new Notice('应用规则时出错: ' + error.message);
             throw error;
         }
@@ -189,7 +203,7 @@ export default class ObsidianIgnore extends Plugin {
 
     async rollback() {
         try {
-            await this.fileOps.rollback();
+            await this.fileOps?.rollback();
             // 请求 Obsidian 刷新文件列表
             this.app.workspace.trigger('file-menu');
         } catch (error) {
@@ -200,8 +214,8 @@ export default class ObsidianIgnore extends Plugin {
 
     async listCurrentDirectory() {
         try {
-            const files = this.localFs.listDirectory();
-            console.log('[ObsidianIgnore] 根目录文件列表:', files);
+            const files = this.localFs?.listDirectory() || [];
+            console.log('[file-ignore] 根目录文件列表:', files);
 
             // 创建一个临时的 markdown 文件来显示文件列表
             const fileListContent = this.formatFileList(files);
@@ -210,7 +224,7 @@ export default class ObsidianIgnore extends Plugin {
             // 打开这个文件
             await this.app.workspace.getLeaf().openFile(tempFile);
         } catch (error) {
-            console.error('[ObsidianIgnore] 列出目录内容失败:', error);
+            console.error('[file-ignore] 列出目录内容失败:', error);
             new Notice('列出目录内容失败: ' + error.message);
         }
     }
