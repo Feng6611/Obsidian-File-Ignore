@@ -5,16 +5,14 @@ on:
     tags:
       - "*"
 
-permissions:
-  contents: write
-
 env:
   PLUGIN_NAME: file-ignore
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v3
         with:
@@ -50,7 +48,7 @@ jobs:
           zip -r ${{ env.PLUGIN_NAME }}.zip ${{ env.PLUGIN_NAME }}
           
           gh release create "$tag" \
-            --draft \
             --title="$tag" \
+            --draft \
             --notes "Release $tag" \
             main.js manifest.json styles.css versions.json "${{ env.PLUGIN_NAME }}.zip" 

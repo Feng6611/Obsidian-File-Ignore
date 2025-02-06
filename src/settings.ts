@@ -22,12 +22,14 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
     constructor(app: App, plugin: ObsidianIgnore) {
         super(app, plugin);
         this.plugin = plugin;
-        // 获取 Obsidian 当前语言设置
-        const locale = (window as any).localStorage.getItem('language') || 'en';
+
+        // 获取系统语言设置
+        const locale = navigator.language.toLowerCase() || 'en';
+
         // 根据语言代码选择对应的翻译
         if (locale.startsWith('zh')) {
             // 检查是否为繁体中文
-            if (locale === 'zh-TW' || locale === 'zh-HK') {
+            if (locale === 'zh-tw' || locale === 'zh-hk') {
                 this.t = locales['zh-TW'];
             } else {
                 // 其他中文默认使用简体中文
@@ -56,7 +58,7 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
 
     // 立即更新匹配文件列表的方法
     private async updateMatchedFilesImpl() {
-        const filesListContainer = this.containerEl.querySelector('.matched-files-list-container');
+        const filesListContainer = this.containerEl.querySelector('.file-ignore-matched-files-list-container');
         if (filesListContainer instanceof HTMLElement) {
             await this.createMatchedFilesList(filesListContainer);
         }
@@ -125,46 +127,29 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
             .setHeading();
 
         // 创建主容器
-        const mainContainer = containerEl.createDiv('main-container');
-        mainContainer.style.display = 'flex';
-        mainContainer.style.gap = '20px';
-        mainContainer.style.marginTop = '12px';
-        mainContainer.style.height = '400px';  // 设置整体高度
+        const mainContainer = containerEl.createDiv('file-ignore-main-container');
 
         // 左侧面板
-        const leftPanel = mainContainer.createDiv('left-panel');
-        leftPanel.style.flex = '1';
-        leftPanel.style.display = 'flex';
-        leftPanel.style.flexDirection = 'column';
+        const leftPanel = mainContainer.createDiv('file-ignore-left-panel');
 
         // 左侧：规则说明
-        const rulesDescContainer = leftPanel.createDiv('rules-desc-container');
-        rulesDescContainer.style.marginBottom = '12px';
+        const rulesDescContainer = leftPanel.createDiv('file-ignore-rules-desc-container');
 
         const descContainer = rulesDescContainer.createDiv('setting-item-description');
         descContainer.createSpan({ text: this.t.ignoreRules.formatTitle });
-        const formatList = descContainer.createDiv();
-        formatList.style.marginTop = '8px';
-        formatList.style.marginLeft = '8px';
+        const formatList = descContainer.createDiv('file-ignore-format-list');
 
         this.t.ignoreRules.formats.forEach(text => {
-            const item = formatList.createDiv();
-            item.style.marginBottom = '4px';
+            const item = formatList.createDiv('file-ignore-format-list-item');
             item.createSpan({ text: '• ' + text });
         });
 
         // 左侧：规则输入框容器
-        const textAreaContainer = leftPanel.createDiv('rules-textarea-container');
-        textAreaContainer.style.flex = '1';
-        textAreaContainer.style.display = 'flex';
-        textAreaContainer.style.flexDirection = 'column';
-        textAreaContainer.style.border = '1px solid var(--background-modifier-border)';
-        textAreaContainer.style.borderRadius = '4px';
-        textAreaContainer.style.backgroundColor = 'var(--background-primary)';
-        textAreaContainer.style.overflow = 'hidden';
+        const textAreaContainer = leftPanel.createDiv('file-ignore-rules-textarea-container');
 
         // 规则输入框
         this.rulesTextArea = new TextAreaComponent(textAreaContainer);
+        this.rulesTextArea.inputEl.addClass('file-ignore-rules-textarea');
 
         // 先设置值，此时还没有注册 onChange 事件，不会触发更新
         this.rulesTextArea.setValue(this.plugin.settings.rules || 'node_modules/\nsrc/');
@@ -183,47 +168,21 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
             }
         });
 
-        const textAreaEl = this.rulesTextArea.inputEl;
-        textAreaEl.style.width = '100%';
-        textAreaEl.style.height = '100%';
-        textAreaEl.style.border = 'none';
-        textAreaEl.style.borderRadius = '4px';
-        textAreaEl.style.padding = '12px';
-        textAreaEl.style.resize = 'none';
-        textAreaEl.style.minHeight = '200px';
-        textAreaEl.style.backgroundColor = 'var(--background-modifier-form-field)';
-
         // 右侧面板
-        const rightPanel = mainContainer.createDiv('right-panel');
-        rightPanel.style.flex = '1';
-        rightPanel.style.display = 'flex';
-        rightPanel.style.flexDirection = 'column';
+        const rightPanel = mainContainer.createDiv('file-ignore-right-panel');
 
         // 右侧：匹配文件容器
-        const matchedFilesContainer = rightPanel.createDiv('matched-files-outer-container');
-        matchedFilesContainer.style.flex = '1';
-        matchedFilesContainer.style.border = '1px solid var(--background-modifier-border)';
-        matchedFilesContainer.style.borderRadius = 'var(--input-radius)';
-        matchedFilesContainer.style.backgroundColor = 'var(--background-secondary)';
-        matchedFilesContainer.style.display = 'flex';
-        matchedFilesContainer.style.flexDirection = 'column';
-        matchedFilesContainer.style.overflow = 'hidden';
+        const matchedFilesContainer = rightPanel.createDiv('file-ignore-matched-files-outer-container');
 
         // 标题放在框内
-        const titleContainer = matchedFilesContainer.createDiv('matched-files-title-container');
-        titleContainer.style.padding = '12px';
-        titleContainer.style.backgroundColor = 'var(--background-modifier-form-field)';
+        const titleContainer = matchedFilesContainer.createDiv('file-ignore-matched-files-title-container');
         titleContainer.createEl('p', {
             text: this.t.ignoreRules.matchedFiles,
-            cls: 'setting-item-name'
-        }).style.margin = '0';
+            cls: 'setting-item-name file-ignore-matched-files-title'
+        });
 
         // 文件列表容器
-        const filesListContainer = matchedFilesContainer.createDiv('matched-files-list-container');
-        filesListContainer.style.padding = '12px';
-        filesListContainer.style.overflowY = 'auto';
-        filesListContainer.style.flex = '1';
-        filesListContainer.style.backgroundColor = 'var(--background-modifier-form-field)';
+        const filesListContainer = matchedFilesContainer.createDiv('file-ignore-matched-files-list-container');
 
         // 初始化时立即更新匹配文件列表
         await this.updateMatchedFilesImmediate();
@@ -236,10 +195,8 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
         if (!this.plugin.fileOps) {
             const errorEl = container.createEl('p', {
                 text: 'FileOperations 未初始化',
-                cls: 'setting-item-description'
+                cls: 'setting-item-description file-ignore-no-matches'
             });
-            errorEl.style.textAlign = 'center';
-            errorEl.style.margin = '0';
             return;
         }
 
@@ -249,25 +206,20 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
             .filter(line => line && !line.startsWith('#'));
 
         const matchedFiles = await this.plugin.fileOps.getFilesToProcess(currentRules);
-        const listEl = container.createDiv('matched-files');
+        const listEl = container.createDiv('file-ignore-matched-files');
 
         if (matchedFiles.length === 0) {
             const noMatchesEl = listEl.createEl('p', {
                 text: this.t.ignoreRules.noMatches,
-                cls: 'setting-item-description'
+                cls: 'setting-item-description file-ignore-no-matches'
             });
-            noMatchesEl.style.textAlign = 'center';
-            noMatchesEl.style.margin = '0';
             return;
         }
 
-        const filesContainer = listEl.createDiv('setting-item-description');
-        filesContainer.style.display = 'flex';
-        filesContainer.style.flexDirection = 'column';
-        filesContainer.style.gap = '8px';
+        const filesContainer = listEl.createDiv('setting-item-description file-ignore-matched-files');
 
         matchedFiles.forEach(file => {
-            const fileItem = filesContainer.createDiv();
+            const fileItem = filesContainer.createDiv('file-ignore-file-item');
             const displayPath = file.isDirectory ? file.path + '/' : file.path;
             fileItem.createSpan({ text: displayPath });
         });
