@@ -4,6 +4,11 @@ import { ObsidianIgnoreSettings, DEFAULT_SETTINGS, ObsidianIgnoreSettingTab } fr
 import { LocalFileSystem, FileInfo } from './localFileSystem';
 import { debounce } from './utils/debounce';
 
+// 在文件顶部或合适位置增加接口定义
+interface FileSystemAdapterExtended {
+    getBasePath(): string;
+}
+
 export default class ObsidianIgnore extends Plugin {
     settings: ObsidianIgnoreSettings;
     fileOps: FileOperations | undefined;
@@ -15,8 +20,9 @@ export default class ObsidianIgnore extends Plugin {
             await this.loadSettings();
             console.log('[file-ignore] 设置加载完成:', this.settings);
 
-            // 获取 vault 根目录路径
-            const basePath = (this.app.vault.adapter as any).getBasePath();
+            // 替换原来的 cast，将 vault.adapter 转换为 FileSystemAdapterExtended 类型
+            const adapter = (this.app.vault.adapter as unknown) as FileSystemAdapterExtended;
+            const basePath = adapter.getBasePath();
             this.fileOps = new FileOperations(this.app.vault);
             this.localFs = new LocalFileSystem(basePath);
             console.log('[file-ignore] FileOperations 初始化完成');

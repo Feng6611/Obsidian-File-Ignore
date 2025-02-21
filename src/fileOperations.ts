@@ -5,6 +5,10 @@ import path from 'path';
 import fs from 'fs';
 import { debounce } from './utils/debounce';
 
+interface FileSystemAdapterExtended {
+    getBasePath(): string;
+}
+
 export interface FileOperation {
     oldPath: string;
     newPath: string;
@@ -26,8 +30,9 @@ export class FileOperations {
 
     constructor(vault: Vault) {
         this.vault = vault;
-        // @ts-ignore
-        this.localFs = new LocalFileSystem(this.vault.adapter.getBasePath());
+        // 通过泛型转换获得 adapter 的类型并获取 basePath
+        const adapter = (this.vault.adapter as unknown) as FileSystemAdapterExtended;
+        this.localFs = new LocalFileSystem(adapter.getBasePath());
         // 初始化防抖函数，设置 1.5s 延迟
         this.debouncedGetFilesToProcess = debounce(
             async (rules: string[]) => this._getFilesToProcess(rules),
