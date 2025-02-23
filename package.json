@@ -1,7 +1,7 @@
 {
   "name": "file-ignore",
-  "version": "0.1.0",
-  "description": "Control Obsidian's file indexing by adding or removing dot prefix to files, providing a .gitignore-like experience",
+  "version": "0.1.1",
+  "description": "Control files indexing by adding or removing dot prefix to files, providing a .gitignore-like experience",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

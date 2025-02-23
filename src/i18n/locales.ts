@@ -30,22 +30,22 @@ export interface Translation {
 export const en: Translation = {
     settingsTitle: 'File Ignore Settings',
     applyRules: {
-        name: 'Hide Files',
+        name: 'Hide files',
         desc: 'Add dot prefix to hide matched files',
-        button: 'Hide Files',
+        button: 'Hide files',
         success: 'Files hidden successfully',
         error: 'Failed to hide files: ',
     },
     revertRules: {
-        name: 'Show Files',
+        name: 'Show files',
         desc: 'Remove dot prefix to show matched files',
-        button: 'Show Files',
+        button: 'Show files',
         success: 'Files shown successfully',
         error: 'Failed to show files: ',
     },
     ignoreRules: {
-        title: 'Ignore Rules',
-        formatTitle: 'Rule Format (one per line):',
+        title: 'Ignore rules',
+        formatTitle: 'Rule format (one per line):',
         formats: [
             'File pattern: test.md',
             'Root path: /readme.md',
@@ -53,7 +53,7 @@ export const en: Translation = {
             'Wildcard: *test/'
         ],
         noMatches: 'No matching files',
-        matchedFiles: 'Matched Files',
+        matchedFiles: 'Matched files',
     },
 };
 

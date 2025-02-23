@@ -2,7 +2,6 @@ import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, TFolder } from '
 import { FileOperations } from './fileOperations';
 import { ObsidianIgnoreSettings, DEFAULT_SETTINGS, ObsidianIgnoreSettingTab } from './settings';
 import { LocalFileSystem, FileInfo } from './localFileSystem';
-import { debounce } from './utils/debounce';
 
 // 在文件顶部或合适位置增加接口定义
 interface FileSystemAdapterExtended {
@@ -15,29 +14,31 @@ export default class ObsidianIgnore extends Plugin {
     localFs: LocalFileSystem | undefined;
 
     async onload() {
-        console.log('[file-ignore] 插件开始加载...');
         try {
+            // 1. 首先加载设置
             await this.loadSettings();
-            console.log('[file-ignore] 设置加载完成:', this.settings);
 
-            // 替换原来的 cast，将 vault.adapter 转换为 FileSystemAdapterExtended 类型
+            // 2. 现在可以安全地使用 settings 了
+            if (this.settings.debug) {
+                console.log('[file-ignore] 插件开始加载...');
+            }
+
+            // 3. 初始化文件系统
             const adapter = (this.app.vault.adapter as unknown) as FileSystemAdapterExtended;
             const basePath = adapter.getBasePath();
+
+            if (this.settings.debug) {
+                console.log('[file-ignore] 设置加载完成:', this.settings);
+                console.log('[file-ignore] FileOperations 初始化完成');
+                console.log('[file-ignore] LocalFileSystem 初始化完成, 根目录:', basePath);
+            }
+
+            // 4. 初始化其他组件
             this.fileOps = new FileOperations(this.app.vault);
             this.localFs = new LocalFileSystem(basePath);
-            console.log('[file-ignore] FileOperations 初始化完成');
-            console.log('[file-ignore] LocalFileSystem 初始化完成, 根目录:', basePath);
 
-            // 添加设置标签页
+            // 5. 添加设置标签页
             this.addSettingTab(new ObsidianIgnoreSettingTab(this.app, this));
-
-            // 监听文件变更
-            this.registerEvent(
-                this.app.vault.on('rename', () => {
-                    // 使用 requestSaveLayout 来刷新文件列表
-                    this.app.workspace.requestSaveLayout();
-                })
-            );
 
             // 添加命令
             this.addCommand({

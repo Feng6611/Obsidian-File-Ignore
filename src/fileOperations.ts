@@ -3,7 +3,7 @@ import minimatch from 'minimatch';
 import { LocalFileSystem, FileInfo } from './localFileSystem';
 import path from 'path';
 import fs from 'fs';
-import { debounce } from './utils/debounce';
+import { debounce } from 'obsidian';
 
 interface FileSystemAdapterExtended {
     getBasePath(): string;
@@ -26,7 +26,7 @@ export class FileOperations {
     private operations: FileOperation[] = [];
     private DEBUG = false;  // 默认关闭调试模式
     private rules: Rule[] = [];
-    private debouncedGetFilesToProcess: (rules: string[]) => Promise<FileInfo[]>;
+    private debouncedGetFilesToProcess: (rules: string[], resolve: (result: FileInfo[]) => void, reject: (error: any) => void) => void;
 
     constructor(vault: Vault) {
         this.vault = vault;
@@ -35,7 +35,9 @@ export class FileOperations {
         this.localFs = new LocalFileSystem(adapter.getBasePath());
         // 初始化防抖函数，设置 1.5s 延迟
         this.debouncedGetFilesToProcess = debounce(
-            async (rules: string[]) => this._getFilesToProcess(rules),
+            (rules: string[], resolve: (result: FileInfo[]) => void, reject: (error: any) => void) => {
+                this._getFilesToProcess(rules).then(resolve).catch(reject);
+            },
             1500
         );
     }
@@ -132,7 +134,9 @@ export class FileOperations {
      * 获取需要处理的文件列表（带防抖的公共方法）
      */
     async getFilesToProcess(rules: string[]): Promise<FileInfo[]> {
-        return this.debouncedGetFilesToProcess(rules);
+        return new Promise((resolve, reject) => {
+            this.debouncedGetFilesToProcess(rules, resolve, reject);
+        });
     }
 
     /**

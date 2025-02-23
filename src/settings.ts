@@ -1,7 +1,7 @@
 import { App, PluginSettingTab, Setting, TextAreaComponent, ButtonComponent, Notice } from 'obsidian';
 import type ObsidianIgnore from './main';
 import { locales, type Translation } from './i18n/locales';
-import { debounce } from './utils/debounce';
+import { debounce } from "obsidian";
 
 export interface ObsidianIgnoreSettings {
     rules: string;  // 保持为字符串类型，存储原始文本
@@ -17,7 +17,7 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
     plugin: ObsidianIgnore;
     rulesTextArea: TextAreaComponent;
     t: Translation;
-    private debouncedUpdateMatchedFiles: () => Promise<void>;
+    private debouncedUpdateMatchedFiles: () => void;
 
     constructor(app: App, plugin: ObsidianIgnore) {
         super(app, plugin);
@@ -42,10 +42,10 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
             this.t = locales.en;
         }
 
-        // 初始化防抖函数，设置 1.5s 延迟
+        // 修改 debounce 的实现
         this.debouncedUpdateMatchedFiles = debounce(
-            async () => {
-                await this.updateMatchedFilesImpl();
+            () => {
+                this.updateMatchedFilesImpl();  // 移除 async/await
             },
             1500
         );
@@ -64,9 +64,10 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
         }
     }
 
-    // 用于防抖更新的方法
+    // 修改为普通的 Promise 方法
     private async updateMatchedFiles() {
-        await this.debouncedUpdateMatchedFiles();
+        this.debouncedUpdateMatchedFiles();
+        return Promise.resolve();
     }
 
     // 用于立即更新的方法
@@ -77,9 +78,6 @@ export class ObsidianIgnoreSettingTab extends PluginSettingTab {
     async display(): Promise<void> {
         const { containerEl } = this;
         containerEl.empty();
-
-        // 标题
-        containerEl.createEl('h2', { text: this.t.settingsTitle });
 
         // 1. 应用规则按钮
         new Setting(containerEl)
