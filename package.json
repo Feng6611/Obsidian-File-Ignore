@@ -1,6 +1,6 @@
 {
   "name": "file-ignore",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Control files indexing by adding or removing dot prefix to files, providing a .gitignore-like experience",
   "main": "main.js",
   "scripts": {

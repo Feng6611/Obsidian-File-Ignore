@@ -1,7 +1,7 @@
 {
     "id": "file-ignore",
     "name": "File Ignore",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "minAppVersion": "0.15.0",
     "description": "Control file indexing by adding or removing dot prefix to files, providing a .gitignore-like experience",
     "author": "Chen",
