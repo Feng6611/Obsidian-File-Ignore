@@ -1,22 +1,28 @@
 import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, TFolder } from 'obsidian';
 import { FileOperations } from './fileOperations';
-import { ObsidianIgnoreSettings, DEFAULT_SETTINGS, ObsidianIgnoreSettingTab } from './settings';
+import { FileIgnoreSettings, DEFAULT_SETTINGS, FileIgnoreSettingTab } from './settings';
 import { LocalFileSystem, FileInfo } from './localFileSystem';
+import { locales, type Translation } from './i18n/locales';
+import moment from 'moment';
 
 // 在文件顶部或合适位置增加接口定义
 interface FileSystemAdapterExtended {
     getBasePath(): string;
 }
 
-export default class ObsidianIgnore extends Plugin {
-    settings: ObsidianIgnoreSettings;
+export default class FileIgnorePlugin extends Plugin {
+    settings: FileIgnoreSettings;
     fileOps: FileOperations | undefined;
     localFs: LocalFileSystem | undefined;
+    t: Translation;
 
     async onload() {
         try {
             // 1. 首先加载设置
             await this.loadSettings();
+
+            // Add a new Notice right after loading settings
+            // new Notice('Settings loaded!'); // <-- 移除测试 Notice
 
             // 2. 现在可以安全地使用 settings 了
             if (this.settings.debug) {
@@ -38,12 +44,34 @@ export default class ObsidianIgnore extends Plugin {
             this.localFs = new LocalFileSystem(basePath);
 
             // 5. 添加设置标签页
-            this.addSettingTab(new ObsidianIgnoreSettingTab(this.app, this));
+            this.addSettingTab(new FileIgnoreSettingTab(this.app, this));
+
+            // 6. 初始化翻译 （新增）
+            const locale = moment.locale(); // <-- 使用 Obsidian 的 locale
+
+            if (locale.startsWith('zh')) {
+                if (locale === 'zh-tw' || locale === 'zh-hk') {
+                    this.t = locales['zh-TW'];
+                } else {
+                    this.t = locales['zh-CN'];
+                }
+            } else if (locale === 'ja') {
+                this.t = locales.ja;
+            } else {
+                this.t = locales.en;
+            }
+            if (this.settings.debug) {
+                console.log('[file-ignore] Main locale:', locale);
+            }
+
+            // 在这里添加 Notice 来显示检测到的 locale 和最终选择的翻译键
+            const usedLocaleKey = Object.keys(locales).find(key => locales[key] === this.t) || 'unknown';
+            // new Notice(`Detected: ${locale}, Using: ${usedLocaleKey}`); // <-- 移除测试 Notice
 
             // 添加命令
             this.addCommand({
                 id: 'apply-ignore-rules',
-                name: '应用忽略规则',
+                name: this.t.commands.applyRules,
                 callback: async () => {
                     await this.applyRules();
                 },
@@ -51,7 +79,7 @@ export default class ObsidianIgnore extends Plugin {
 
             this.addCommand({
                 id: 'add-dot-prefix',
-                name: '添加点前缀（隐藏）',
+                name: this.t.commands.addDot,
                 checkCallback: (checking: boolean) => {
                     const file = this.app.workspace.getActiveFile();
                     if (file) {
@@ -66,7 +94,7 @@ export default class ObsidianIgnore extends Plugin {
 
             this.addCommand({
                 id: 'remove-dot-prefix',
-                name: '移除点前缀（显示）',
+                name: this.t.commands.removeDot,
                 checkCallback: (checking: boolean) => {
                     const file = this.app.workspace.getActiveFile();
                     if (file) {
@@ -79,24 +107,17 @@ export default class ObsidianIgnore extends Plugin {
                 }
             });
 
-            this.addCommand({
-                id: 'list-directory',
-                name: '列出当前目录文件',
-                callback: async () => {
-                    await this.listCurrentDirectory();
-                },
-            });
-
             // 添加右键菜单
             this.registerEvent(
                 this.app.workspace.on('file-menu', (menu, file) => {
                     if (file instanceof TFile || file instanceof TFolder) {
                         menu.addItem((item) => {
+                            const isHidden = file.path.startsWith('.');
                             item
-                                .setTitle(file.path.startsWith('.') ? '取消隐藏' : '隐藏')
-                                .setIcon(file.path.startsWith('.') ? 'eye' : 'eye-off')
+                                .setTitle(isHidden ? this.t.menu.show : this.t.menu.hide)
+                                .setIcon(isHidden ? 'eye' : 'eye-off')
                                 .onClick(async () => {
-                                    if (file.path.startsWith('.')) {
+                                    if (isHidden) {
                                         await this.removeDotPrefix(file);
                                     } else {
                                         await this.addDotPrefix(file);
@@ -144,12 +165,13 @@ export default class ObsidianIgnore extends Plugin {
             const fileInfo = this.localFs?.getFileInfo(file.path);
             if (fileInfo) {
                 await this.fileOps?.addDotPrefix(fileInfo, true);
-                new Notice(`${file instanceof TFolder ? '文件夹' : '文件'}已隐藏`);
+                const itemType = file instanceof TFolder ? this.t.notice.folder : this.t.notice.file;
+                new Notice(this.t.notice.hidden.replace('{itemType}', itemType));
                 this.app.workspace.requestSaveLayout();
             }
         } catch (error) {
             console.error('隐藏失败:', error);
-            new Notice('隐藏失败');
+            new Notice(this.t.notice.hideError);
         }
     }
 
@@ -158,12 +180,13 @@ export default class ObsidianIgnore extends Plugin {
             const fileInfo = this.localFs?.getFileInfo(file.path);
             if (fileInfo) {
                 await this.fileOps?.addDotPrefix(fileInfo, false);
-                new Notice(`${file instanceof TFolder ? '文件夹' : '文件'}已显示`);
+                const itemType = file instanceof TFolder ? this.t.notice.folder : this.t.notice.file;
+                new Notice(this.t.notice.shown.replace('{itemType}', itemType));
                 this.app.workspace.requestSaveLayout();
             }
         } catch (error) {
             console.error('显示失败:', error);
-            new Notice('显示失败');
+            new Notice(this.t.notice.showError);
         }
     }
 
@@ -175,11 +198,11 @@ export default class ObsidianIgnore extends Plugin {
 
             const rules = this.settings.rules
                 .split('\n')
-                .map(line => line.trim())
-                .filter(line => line && !line.startsWith('#'));
+                .map((line: string) => line.trim())
+                .filter((line: string) => line && !line.startsWith('#'));
 
             if (!rules.length) {
-                new Notice('没有有效的规则');
+                new Notice(this.t.notice.noRules);
                 return;
             }
 
@@ -190,7 +213,7 @@ export default class ObsidianIgnore extends Plugin {
                 files.map(f => f.isDirectory ? f.path + '/' : f.path));
 
             if (files.length === 0) {
-                new Notice('没有找到匹配的文件');
+                new Notice(this.t.notice.noMatches);
                 return;
             }
 
@@ -198,12 +221,13 @@ export default class ObsidianIgnore extends Plugin {
                 await this.fileOps.addDotPrefix(file, isAdd);
             }
 
-            new Notice(`成功${isAdd ? '隐藏' : '显示'} ${files.length} 个项目`);
+            const noticeMessage = isAdd ? this.t.notice.applied(files.length) : this.t.notice.reverted(files.length);
+            new Notice(noticeMessage);
             // 请求 Obsidian 刷新文件列表
             this.app.workspace.requestSaveLayout();
         } catch (error) {
             console.error('[file-ignore] 应用规则时出错:', error);
-            new Notice('应用规则时出错: ' + error.message);
+            new Notice(this.t.notice.applyError(error.message));
             throw error;
         }
     }
@@ -217,67 +241,5 @@ export default class ObsidianIgnore extends Plugin {
             console.error('回滚操作失败:', error);
             throw error;
         }
-    }
-
-    async listCurrentDirectory() {
-        try {
-            const files = this.localFs?.listDirectory() || [];
-            console.log('[file-ignore] 根目录文件列表:', files);
-
-            // 创建一个临时的 markdown 文件来显示文件列表
-            const fileListContent = this.formatFileList(files);
-            const tempFile = await this.app.vault.create('文件列表.md', fileListContent);
-
-            // 打开这个文件
-            await this.app.workspace.getLeaf().openFile(tempFile);
-        } catch (error) {
-            console.error('[file-ignore] 列出目录内容失败:', error);
-            new Notice('列出目录内容失败: ' + error.message);
-        }
-    }
-
-    private formatFileList(files: FileInfo[]): string {
-        let content = '# 当前目录文件列表\n\n';
-
-        // 分别处理文件夹和文件
-        const directories = files.filter(f => f.isDirectory);
-        const normalFiles = files.filter(f => !f.isDirectory);
-
-        // 添加文件夹列表
-        content += '## 文件夹\n\n';
-        if (directories.length > 0) {
-            directories.forEach(dir => {
-                content += `- 📁 ${dir.path}\n`;
-            });
-        } else {
-            content += '- *没有文件夹*\n';
-        }
-
-        // 添加文件列表
-        content += '\n## 文件\n\n';
-        if (normalFiles.length > 0) {
-            normalFiles.forEach(file => {
-                const size = this.formatFileSize(file.stats.size);
-                const mtime = file.stats.mtime.toLocaleString();
-                content += `- 📄 ${file.path}\n  - 大小: ${size}\n  - 修改时间: ${mtime}\n`;
-            });
-        } else {
-            content += '- *没有文件*\n';
-        }
-
-        return content;
-    }
-
-    private formatFileSize(bytes: number): string {
-        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        let size = bytes;
-        let unitIndex = 0;
-
-        while (size >= 1024 && unitIndex < units.length - 1) {
-            size /= 1024;
-            unitIndex++;
-        }
-
-        return `${size.toFixed(2)} ${units[unitIndex]}`;
     }
 } 

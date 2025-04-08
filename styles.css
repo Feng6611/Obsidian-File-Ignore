@@ -32,104 +32,316 @@
     background-color: var(--interactive-accent-hover);
 }
 
-/* 设置页面样式 */
-.file-ignore-main-container {
-    display: flex;
-    gap: 20px;
-    margin-top: 12px;
-    height: 400px;
+/* 设置页面标题 */
+.file-ignore-settings-title {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: var(--text-normal);
+    border-bottom: 1px solid var(--background-modifier-border);
+    padding-bottom: 8px;
 }
 
+/* 新增顶部行样式 */
+.file-ignore-top-action-row {
+    display: flex;
+    justify-content: space-between; /* 两端对齐 */
+    align-items: center;
+    margin-bottom: 24px;
+    padding: 8px 12px; /* 减少垂直内边距 */
+    background-color: var(--background-secondary);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 行内状态指示器 */
+.file-ignore-status-inline-container {
+    flex-shrink: 0; /* 防止被压缩 */
+}
+
+/* 按钮组 */
+.file-ignore-button-group {
+    display: flex;
+    gap: 8px; /* 按钮间距 */
+    flex-shrink: 0; /* 防止被压缩 */
+}
+
+/* 调整 Setting 组件内部按钮的边距 (如果需要) */
+.file-ignore-top-action-row .setting-item-control button {
+    margin-left: 0; /* 移除默认的左边距 */
+}
+
+.file-ignore-status-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.file-ignore-status-icon {
+    color: var(--text-accent);
+    display: flex;
+    align-items: center;
+}
+
+.file-ignore-status-icon svg {
+    vertical-align: middle; /* 图标垂直居中 */
+}
+
+/* 加载图标动画 */
+.file-ignore-loading .file-ignore-status-icon svg {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.file-ignore-status-text {
+    font-size: 14px;
+    color: var(--text-normal);
+}
+
+/* 设置页面样式 */
+/* 旧的主容器 */
+/*
+.file-ignore-main-container {
+    display: flex;
+    gap: 24px; 
+    margin-top: 16px;
+    height: 460px; 
+}
 .file-ignore-left-panel {
     flex: 1;
     display: flex;
     flex-direction: column;
 }
-
-.file-ignore-rules-desc-container {
-    margin-bottom: 12px;
-}
-
-.file-ignore-format-list {
-    margin-top: 8px;
-    margin-left: 8px;
-}
-
-.file-ignore-format-list-item {
-    margin-bottom: 4px;
-}
-
-.file-ignore-rules-textarea-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    background-color: var(--background-primary);
-    overflow: hidden;
-}
-
-.file-ignore-rules-textarea {
-    width: 100%;
-    height: 100%;
-    border: none;
-    border-radius: 4px;
-    padding: 12px;
-    resize: none;
-    min-height: 200px;
-    background-color: var(--background-modifier-form-field);
-}
-
 .file-ignore-right-panel {
     flex: 1;
     display: flex;
     flex-direction: column;
 }
+*/
 
-.file-ignore-matched-files-outer-container {
-    flex: 1;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: var(--input-radius);
+/* 新的规则格式说明容器 */
+.file-ignore-rule-format-container {
+    margin-bottom: 16px;
+    padding: 8px 12px; /* 减少 padding */
     background-color: var(--background-secondary);
+    border-radius: 8px;
+    font-size: 13px; /* 稍小字体 */
+    color: var(--text-muted);
+}
+
+/* 行内格式文本 */
+.file-ignore-format-inline {
+    display: inline; /* 直接显示文本 */
+}
+
+/* 新的主行容器 (左右布局) */
+.file-ignore-main-row-container {
+    display: flex;
+    gap: 20px; /* 适当的间距 */
+    margin-top: 16px;
+    /* 高度由内容决定 */
+    min-height: 300px;
+}
+
+/* 左侧输入面板 */
+.file-ignore-input-panel {
+    flex: 1; /* 保持均分 */
     display: flex;
     flex-direction: column;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background-color: var(--background-primary);
     overflow: hidden;
 }
 
-.file-ignore-matched-files-title-container {
-    padding: 12px;
-    background-color: var(--background-modifier-form-field);
+/* 右侧匹配文件面板 */
+.file-ignore-matched-panel {
+    flex: 1; /* 保持均分 */
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background-color: var(--background-primary);
+    overflow: hidden;
 }
 
+/* 标题容器通用样式 */
+.file-ignore-panel-title-container,
+.file-ignore-matched-files-title-container {
+    padding: 8px 12px;
+    background-color: var(--background-primary);
+    border-bottom: 1px solid var(--background-modifier-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 40px;
+}
+
+/* 标题文本通用样式 */
+.file-ignore-panel-title,
 .file-ignore-matched-files-title {
     margin: 0;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--text-normal);
 }
 
+/* 规则操作按钮容器 */
+.file-ignore-rule-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* 按钮样式 */
+.file-ignore-small-button {
+    font-size: 13px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    background-color: var(--background-secondary);
+    color: var(--text-normal);
+    border: none;
+    transition: background-color 0.15s ease;
+}
+
+.file-ignore-small-button:hover {
+    background-color: var(--background-secondary-alt);
+}
+
+/* 文本区域容器 */
+.file-ignore-rules-textarea-container {
+    flex-grow: 1;
+    padding: 12px;
+    background-color: var(--background-primary);
+}
+
+/* 文本区域 */
+.file-ignore-rules-textarea {
+    width: 100%;
+    height: 100%;
+    border: none;
+    padding: 8px;
+    resize: none;
+    background-color: var(--background-primary);
+    font-family: var(--font-monospace);
+    font-size: 14px;
+    line-height: 1.5;
+    border-radius: 0;
+}
+
+/* 右侧匹配文件容器 */
+.file-ignore-matched-files-outer-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--background-primary);
+}
+
+/* 右侧列表容器 */
 .file-ignore-matched-files-list-container {
     padding: 12px;
     overflow-y: auto;
     flex: 1;
-    background-color: var(--background-modifier-form-field);
+    background-color: var(--background-primary);
 }
 
+/* 匹配数量信息 */
+.file-ignore-count-info {
+    margin: 0 0 12px 0;
+    padding: 4px 8px;
+    background-color: var(--background-secondary);
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--text-muted);
+    display: inline-block;
+}
+
+/* 匹配文件列表 */
 .file-ignore-matched-files {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
-.file-ignore-no-matches {
-    text-align: center;
-    margin: 0;
+/* 简化的匹配文件列表 */
+.file-ignore-matched-files-simplified {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
+/* 文件项 */
 .file-ignore-file-item {
-    padding: 6px 8px;
+    padding: 6px 10px;
     border-radius: 4px;
-    background-color: var(--background-primary);
-    transition: background-color 100ms ease-in-out;
+    background-color: var(--background-secondary);
+    transition: all 150ms ease-in-out;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
 }
 
 .file-ignore-file-item:hover {
-    background-color: var(--background-modifier-hover);
+    background-color: var(--background-secondary-alt);
+    transform: translateX(2px);
+}
+
+/* 无匹配提示 */
+.file-ignore-no-matches {
+    text-align: center;
+    margin: 12px 0;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* 文件夹项样式 */
+.file-ignore-folder-item {
+    border-left: 2px solid var(--interactive-accent);
+}
+
+/* 文件项样式 */
+.file-ignore-regular-item {
+    border-left: 2px solid var(--text-accent);
+}
+
+.file-ignore-folder-link, 
+.file-ignore-file-link {
+    display: block;
+    color: var(--text-normal);
+    text-decoration: none;
+    width: 100%;
+    overflow-wrap: break-word;
+}
+
+.file-ignore-folder-link:hover, 
+.file-ignore-file-link:hover {
+    color: var(--text-accent);
+}
+
+/* 加载提示样式 */
+.file-ignore-loading {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* 错误信息样式 */
+.mod-error {
+    color: var(--text-error);
+}
+
+/* 文件项路径 */
+.file-ignore-item-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
 } 
