@@ -65,6 +65,11 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         // console.log("Settings saved via debounce"); // 可选：用于调试
     }, 500, false); // 延迟 500ms 保存
 
+    // Debounced function to update the display
+    debouncedUpdateDisplay = debounce(() => {
+        this.updateDisplayAsync();
+    }, 600, false); // 600ms delay, slightly after save debounce
+
     // 核心异步更新函数：获取数据并调用渲染函数
     private async updateDisplayAsync() {
         // 获取容器引用
@@ -250,7 +255,11 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         this.rulesTextArea.inputEl.setAttribute('rows', '20'); // 增加更多高度
         this.rulesTextArea.inputEl.setAttribute('placeholder', '输入规则，每行一个'); // 添加占位文本
         this.rulesTextArea.setValue(this.plugin.settings.rules || DEFAULT_SETTINGS.rules);
-        this.rulesTextArea.onChange(this.saveSettings); // 直接传递 debounced 函数引用
+        // 修改 onChange 回调
+        this.rulesTextArea.onChange((value) => {
+            this.saveSettings(value); // Trigger debounced save
+            this.debouncedUpdateDisplay(); // Trigger debounced update
+        });
 
         // 右侧面板 (匹配文件)
         const rightPanel = mainContainer.createDiv('file-ignore-matched-panel'); // 重命名 class

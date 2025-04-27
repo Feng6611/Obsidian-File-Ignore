@@ -27,6 +27,7 @@ coverage/
 *.tmp
 *~
 .temp/
+docs/
 
 # 环境变量
 .env

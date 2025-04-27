@@ -1,22 +1,36 @@
 # 📁 File Ignore
 
-An Obsidian plugin that controls file indexing by managing dot prefixes (hidden attributes), providing a .gitignore-like experience.
+An Obsidian plugin that controls file indexing by managing dot prefixes (hidden attributes) on files/folders, providing a `.gitignore`-like experience.
 
 English | [简体中文](README-zh.md)
 
-## 💡 Background
+## Motivation
 
-When using Obsidian to manage repositories with numerous files (like Next.js projects), you might encounter these issues:
+- I use Next.js to manage my blog, writing and publishing through Obsidian. However, `/node_modules` was a headache as Obsidian indexed everything, causing extremely slow startup.
+- Leveraging Obsidian's default behavior of not indexing "dot-prefixed hidden files", I developed this plugin to change indexing behavior by modifying file names.
+- Before using the plugin, opening the repository took about 10s; after using it, it opens almost instantly.
 
-- Obsidian indexes all files (including node_modules), resulting in extremely slow startup
-- Lack of file filtering mechanism similar to .gitignore
-- Manual management of hidden files is tedious and error-prone
+### Related Scenarios
 
-This plugin leverages Obsidian's default behavior of not indexing "dot-prefixed hidden files" to provide a simple file filtering solution. Tests show startup time improvement from 10s to near-instant.
+When your Obsidian vault contains numerous non-note files (like code repositories, attachments, caches):
+
+*   🐢 **Slow Startup & Performance Bottlenecks**: Obsidian tries to index all files (including `node_modules`, `.git`, large attachment folders), leading to long startup times, high RAM and CPU usage, and sluggish operations.
+*   🔍 **Cluttered Workspace**: Global search results get polluted by irrelevant content from `node_modules`, etc.; the graph view becomes crowded and hard to read due to numerous non-note files.
+*   ⚙️ **Limited Built-in Exclusion**: Obsidian's built-in "Exclude files" option often fails to truly prevent performance hits from indexing and isn't convenient to configure.
+
+---
 
 ![Settings Page](setting.png)
 
-## ⚡️ Usage
+## 🚀 Features
+
+*   **File Filtering**: Specify files or folders to ignore based on rules.
+*   **Hide Files**: Add a dot (.) prefix to matched files/folders, making them invisible to Obsidian.
+*   **Show Files**: Remove the previously added dot prefix, restoring visibility.
+*   **.gitignore-Style Patterns**: Use familiar patterns for configuration.
+*   **Index Control**: Prevent Obsidian from indexing and processing irrelevant content.
+
+## ⚙️ Usage
 
 ### Matching Rules
 
@@ -25,18 +39,30 @@ Supports the following matching patterns:
 - Specific file: `test.md`
 - Root directory file: `/readme.md`
 - Entire folder: `temp/`
-- Wildcard matching: `*test/`
+- Wildcard matching: `*test/` (e.g., `/_build/`, `/cache*/`)
 
 ### Operations
 
-The plugin provides two core functions:
+After configuring rules in the plugin settings page, you can:
 
-- "Hide Files": Add a "." prefix to matched files, setting them as hidden
-- "Show Files": Remove the "." prefix from matched files, restoring them as normal files
+- Click **"Hide Files"**: Adds a "." prefix to all files/folders matching the rules.
+- Click **"Show Files"**: Removes the "." prefix from all files/folders matching the rules.
 
-### 🔍 Tips
+### How to Configure?
+Configure your ignore rules in Obsidian's `Settings` -> `Community plugins` -> `File Ignore` settings page.
 
-Recommended to use with the [Show-Hide-Files](https://github.com/polyipseity/obsidian-show-hidden-files) plugin for better hidden file management.
+## 🛠️ Installation
+
+1.  Open `Settings` > `Community plugins` in Obsidian.
+2.  Ensure `Safe mode` is **off**.
+3.  Click `Browse community plugins`.
+4.  Search for "File Ignore".
+5.  Click `Install`.
+6.  Once installed, click `Enable`.
+
+## 🔍 Tips
+
+Recommended to use with the [Show-Hide-Files](https://github.com/polyipseity/obsidian-show-hidden-files) plugin for better management (viewing or manipulating) of files hidden by this plugin.
 
 ## 🤝 Support
 
