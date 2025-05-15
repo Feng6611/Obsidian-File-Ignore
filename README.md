@@ -1,6 +1,7 @@
 # 📁 File Ignore
 
 An Obsidian plugin that controls file indexing by managing dot prefixes (hidden attributes) on files/folders, providing a `.gitignore`-like experience.
+obsidian-file-igonre.kkuk.dev
 
 English | [简体中文](README-zh.md)
 

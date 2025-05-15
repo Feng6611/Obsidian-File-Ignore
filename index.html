@@ -3,105 +3,181 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- SEO Optimized Description -->
-    <meta name="description" content="Fix Obsidian slow startup & performance issues with File Ignore plugin. Exclude node_modules, .git, and other folders like .gitignore to stop indexing, speed up Obsidian, and declutter search & graph view. Manage your vault efficiently.">
-    <!-- SEO Optimized Title -->
-    <title>Obsidian File Ignore Plugin | Stop Indexing node_modules, Boost Performance</title>
+    <title>Obsidian File Ignore: Hide Files, Exclude Folders & Boost Speed</title>
+    <meta name="description" content="Dramatically speed up Obsidian and declutter your workspace with Obsidian File Ignore. Easily hide files and exclude folders like node_modules or .git using .gitignore patterns.">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="/icon.png" type="image/png">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Obsidian File Ignore",
+      "applicationCategory": "ProductivitySoftware",
+      "operatingSystem": "Windows, macOS, Linux, iOS, Android (Obsidian platforms)",
+      "description": "Boost Obsidian performance by truly excluding files and folders like node_modules and .git. Obsidian File Ignore uses .gitignore-style rules to hide items from indexing, search, and graph view.",
+      "abstract": "An Obsidian plugin to prevent indexing of specified files and folders (e.g., node_modules, .git) by adding a dot prefix, similar to .gitignore, for significantly improved performance and a cleaner workspace.",
+      "keywords": "Obsidian File Ignore, Obsidian, plugin, exclude folder, hide files, exclude files, hide folders, node_modules, .git, performance, speed up, .gitignore, index control, obsidian .gitignore, how to exclude folder dataview obsidian, obsidian hide file path",
+      "softwareVersion": "1.2.0",
+      "downloadUrl": "https://obsidian.md/plugins?id=file-ignore",
+      "installUrl": "https://obsidian.md/plugins?id=file-ignore",
+      "browserRequirements": "Requires Obsidian (https://obsidian.md)",
+      "author": {
+        "@type": "Person",
+        "name": "feng6611",
+        "url": "https://github.com/feng6611"
+      },
+      "maintainer": {
+         "@type": "Person",
+         "name": "feng6611",
+         "url": "https://github.com/feng6611"
+      },
+      "publisher": {
+         "@type": "Person",
+         "name": "feng6611",
+         "url": "https://github.com/feng6611"
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "obsidian-file-ignore.kkuk.dev"
+      }
+    }
+    </script>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>📁 File Ignore: Speed Up Your Obsidian Vault</h1>
-            <p class="subtitle">Exclude folders like <code>node_modules</code> & <code>.git</code>. Control file indexing with <code>.gitignore</code>-style rules to boost performance.</p>
+            <h1><i class="fa-solid fa-folder-minus"></i> Obsidian File Ignore</h1>
+            <p class="subtitle">Make your Obsidian faster and cleaner. With simple <code>.gitignore</code>-style rules, easily <strong>hide files</strong> and <strong>exclude folders</strong> like <code>node_modules</code> or <code>.git</code>.</p>
             <div class="cta-buttons">
-                <a href="https://obsidian.md/plugins?id=file-ignore" class="button button-secondary">View on Obsidian Plugins</a>
-                <a href="https://github.com/feng6611/obsidian-file-ignore" class="button button-secondary">View on GitHub</a>
+                <a href="https://obsidian.md/plugins?id=file-ignore" class="button" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-download"></i> Install from Obsidian</a>
+                <a href="https://github.com/feng6611/obsidian-file-ignore" class="button button-secondary" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i> View on GitHub</a>
             </div>
         </header>
 
-        <section id="motivation">
-            <h2>Is Your Obsidian Slow or Cluttered? (Motivation)</h2>
-            <ul>
-                <li>Struggling with **Obsidian slow startup** or lag caused by large folders like <code>/node_modules</code> or <code>.git</code>?</li>
-                <li>Wish you could **exclude folders** from Obsidian's indexing, similar to a <code>.gitignore</code> file?</li>
-                <li>This plugin was developed to fix these **performance issues**, leveraging Obsidian's dotfile behavior to turn a 10s+ startup into near-instant loading.</li>
-            </ul>
-
-            <h3>Common Pain Points & Related Scenarios</h3>
-            <p>If your Obsidian vault contains code repositories, attachments, or caches, you might face:</p>
-            <ul>
-                <li>🐢 **Slow Performance & Bottlenecks**: Obsidian indexing thousands of files (like in <code>node_modules</code> or <code>.git</code>) leads to high RAM/CPU usage and a sluggish UI. Stop unnecessary indexing!</li>
-                <li>🔍 **Cluttered Workspace & Search Results**: Irrelevant files from ignored folders polluting your global search? Messy graph view? Clean them up by excluding folders.</li>
-                <li>⚙️ **Limited Built-in Exclusion**: Obsidian's default 'Exclude files' setting often doesn't fully solve the **performance problem** or offer flexible **index control**.</li>
-            </ul>
-             <p><strong>File Ignore provides a robust solution to truly ignore files and folders.</strong></p>
-        </section>
-
-        <hr>
-
-        <section id="screenshot">
-             <h2>See the File Ignore Settings</h2>
-             <img src="setting.png" alt="File Ignore Plugin Settings Page Screenshot in Obsidian">
+        <section id="problem-solution">
+            <h2><i class="fa-solid fa-circle-exclamation"></i> Is Your Obsidian Vault Overwhelmed?</h2>
+            <p>Large folders like <code>node_modules/</code> or <code>.git/</code> can cripple Obsidian's performance, leading to slow startups and lag. Irrelevant files clutter your search and graph view, hindering your workflow.</p>
+            <p><strong>Obsidian File Ignore</strong> is the solution. It lets you easily <strong>hide files</strong> and <strong>exclude folders</strong> from Obsidian's indexing process, just like a <code>.gitignore</code> file does for Git. The result? A faster, cleaner, and more focused Obsidian experience.</p>
         </section>
 
         <hr>
 
         <section id="features">
-            <h2>🚀 Features: Take Control of Obsidian Indexing</h2>
+            <h2><i class="fa-solid fa-star"></i> Key Features to Streamline Your Vault</h2>
             <ul>
-                <li><strong>File Filtering & Exclusion</strong>: Define rules to specify which files/folders Obsidian should completely ignore.</li>
-                <li><strong>Hide Files (Add Dot Prefix)</strong>: Adds a dot (.) prefix to matched items, effectively hiding them from Obsidian's index, search, and graph.</li>
-                <li><strong>Show Files (Remove Dot Prefix)</strong>: Easily reverse the process and make items visible again.</li>
-                <li><strong><code>.gitignore</code>-Style Patterns</strong>: Use familiar and powerful patterns (e.g., <code>node_modules/</code>, <code>temp/</code>, <code>*.log</code>, <code>/_site/</code>) for **folder exclusion**.</li>
-                <li><strong>True Index Control</strong>: Stops Obsidian from wasting resources processing content you don't need, leading to significant **performance improvements**.</li>
+                <li><strong>Hide Files & Exclude Folders:</strong> Add a dot (<code>.</code>) prefix to specified items, effectively making them invisible to Obsidian's index, search, and graph. Perfect for <code>node_modules</code>, <code>.git</code>, cache directories, and more.</li>
+                <li><strong><code>.gitignore</code>-Style Patterns:</strong> Use familiar and powerful glob patterns (e.g., <code>my_folder/</code>, <code>*.log</code>, <code>/root_file.md</code>) to define what to hide or show.</li>
+                <li><strong>Boost Performance:</strong> By preventing Obsidian from processing unnecessary files, enjoy significantly faster startup times and a more responsive UI.</li>
+                <li><strong>Simple Toggle:</strong> Easily switch between hiding and showing files with dedicated buttons in the plugin settings.</li>
+            </ul>
+        </section>
+        
+        <hr>
+
+        <section id="how-it-works">
+            <h2><i class="fa-solid fa-gears"></i> Simple & Effective: How It Works</h2>
+            <div class="process-flow">
+                <div class="step">
+                    <div class="step-icon"><i class="fa-solid fa-1"></i></div>
+                    <div class="step-content">
+                        <h4>Define Patterns</h4>
+                        <p>Create patterns like <code>node_modules/</code> or <code>*.tmp</code></p>
+                    </div>
+                </div>
+                <div class="step-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                <div class="step">
+                    <div class="step-icon"><i class="fa-solid fa-2"></i></div>
+                    <div class="step-content">
+                        <h4>Hide Files</h4>
+                        <p>Add dot prefix (e.g., <code>.node_modules</code>)</p>
+                    </div>
+                </div>
+                <div class="step-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                <div class="step">
+                    <div class="step-icon"><i class="fa-solid fa-3"></i></div>
+                    <div class="step-content">
+                        <h4>Enjoy</h4>
+                        <p>Experience faster, cleaner Obsidian</p>
+                    </div>
+                </div>
+            </div>
+            <p>Obsidian naturally ignores dotfiles, preventing them from being indexed. Clicking "Show Files" reverses the process, making items visible again. It's a non-destructive way to control visibility.</p>
+        </section>
+
+        <hr>
+        
+        <section id="benefits">
+            <h2><i class="fa-solid fa-check-circle"></i> Why Choose Obsidian File Ignore?</h2>
+            <ul>
+                <li><i class="fa-solid fa-rocket"></i> <strong>Speed Up Obsidian:</strong> Drastically reduce startup times and eliminate lag caused by indexing large, unwanted folders.</li>
+                <li><i class="fa-solid fa-broom"></i> <strong>Declutter Your Workspace:</strong> Keep search results, graph view, and link suggestions clean and relevant. No more <code>node_modules</code> polluting your view!</li>
+                <li><i class="fa-solid fa-bullseye"></i> <strong>Gain Full Control:</strong> Precisely define what Obsidian should pay attention to, tailoring it perfectly to your note-taking and development workflows.</li>
+                <li><i class="fa-solid fa-lightbulb"></i> <strong>Easy to Use:</strong> Intuitive settings and straightforward operations make managing file visibility a breeze.</li>
             </ul>
         </section>
 
         <hr>
 
-        <section id="usage">
-            <h2>⚙️ How to Use: Simple Configuration</h2>
-            <h3>Matching Rules for File Exclusion</h3>
-            <p>Supports patterns like:</p>
-            <ul>
-                <li>Specific file: <code>test.md</code></li>
-                <li>Root directory file: <code>/config.yaml</code></li>
-                <li>Entire folder: <code>temp/</code>, <code>node_modules/</code>, <code>.git/</code> (Essential for **excluding node_modules** and **excluding .git**)</li>
-                <li>Wildcard matching: <code>*cache/</code>, <code>_build/</code>, <code>*.tmp</code></li>
-            </ul>
-            <h3>Operations: Hide or Show Files</h3>
-            <p>Configure your rules in <code>Settings</code> → <code>Community plugins</code> → <code>File Ignore</code>, then click:</p>
-            <ul>
-                <li><strong>"Hide Files"</strong>: Applies dot prefixes to ignore matched items.</li>
-                <li><strong>"Show Files"</strong>: Removes dot prefixes to un-ignore items.</li>
-            </ul>
+        <section id="screenshot-section">
+             <h2><i class="fa-solid fa-image"></i> Plugin Settings Preview</h2>
+             <img src="setting.png" alt="Obsidian File Ignore Plugin Settings Page - Define rules to hide files and exclude folders" loading="lazy">
+             <p class="caption">Easily configure your ignore patterns in the plugin settings</p>
         </section>
 
         <hr>
 
-        <section id="installation">
-            <h2>🛠️ Installation: Get Started Quickly</h2>
+        <section id="quick-start">
+            <h2><i class="fa-solid fa-flag-checkered"></i> Get Started in Minutes</h2>
             <ol>
-                <li>Open <code>Settings</code> > <code>Community plugins</code> in Obsidian.</li>
-                <li>Ensure <code>Safe mode</code> is <strong>off</strong>.</li>
-                <li>Click <code>Browse community plugins</code>.</li>
-                <li>Search for "File Ignore" (or related terms like "exclude folder", "ignore node_modules").</li>
-                <li>Click <code>Install</code>.</li>
-                <li>Once installed, click <code>Enable</code> the File Ignore plugin.</li>
+                <li>Install "File Ignore" from Obsidian's Community Plugins browser</li>
+                <li>Enable the plugin</li>
+                <li>Go to Settings → File Ignore. Add your desired patterns (e.g., <code>node_modules/</code>, <code>*.tmp</code>)</li>
+                <li>Click <strong>"Hide Files"</strong> to apply the rules, or <strong>"Show Files"</strong> to revert</li>
             </ol>
+            <p>It's that simple to reclaim your Obsidian's performance and clarity!</p>
         </section>
 
-         <hr>
+        <hr>
 
-        <section id="tips">
-             <h2>🔍 Tips for Vault Management</h2>
-             <p>Recommended to use with the <a href="https://github.com/polyipseity/obsidian-show-hidden-files">Show-Hide-Files</a> plugin for better management (viewing/manipulating) of files hidden by File Ignore. Helps keep your vault clean!</p>
+        <section id="faq">
+            <h2><i class="fa-solid fa-circle-question"></i> Frequently Asked Questions (FAQ)</h2>
+            <dl>
+                <dt>Q: Will Obsidian File Ignore delete my files?</dt>
+                <dd>A: Absolutely not. The plugin only renames files/folders by adding or removing a dot prefix (e.g., <code>myfolder</code> becomes <code>.myfolder</code>). Your data remains safe in your vault.</dd>
+
+                <dt>Q: Is the hiding process reversible?</dt>
+                <dd>A: Yes, completely. Using the "Show Files" button in the plugin settings will remove the dot prefixes from items that match your rules, making them fully visible and indexable by Obsidian again.</dd>
+
+                <dt>Q: How is this different from Obsidian's built-in "Excluded files" setting?</dt>
+                <dd>A: Obsidian's built-in setting often acts more like a filter for display but may not fully prevent Obsidian from attempting to index or process those files, especially for performance. File Ignore, by renaming to dotfiles (e.g. <code>.myfolder</code>), leverages a more fundamental way Obsidian treats hidden items, leading to more reliable exclusion from indexing and significant performance gains. Plus, File Ignore offers more powerful <code>.gitignore</code>-style pattern matching.</dd>
+                
+                <dt>Q: Can this plugin help exclude files or folders from Dataview queries?</dt>
+                <dd>A: Yes, indirectly. When you use Obsidian File Ignore to hide a file or folder (e.g., turning <code>my_data_folder/</code> into <code>.my_data_folder/</code>), Obsidian itself stops indexing it. Since Dataview and many other plugins rely on Obsidian's index to find and process files, these hidden items will typically not appear in Dataview query results or be processed by those plugins. This is an effective way for "how to exclude folder dataview obsidian" or specific files.</dd>
+
+                <dt>Q: Does this help with "hiding file paths" in Obsidian?</dt>
+                <dd>A: By hiding files and folders, they will no longer appear in Obsidian's standard file explorer, search results, or graph view. In this sense, their paths are effectively hidden from your common daily interactions within Obsidian. While it doesn't change UI elements like the path displayed in the window title bar for an *open* note, it significantly declutters your views by removing unwanted items and their paths from sight.</dd>
+
+                <dt>Q: What if I accidentally hide a critical Obsidian configuration folder like <code>.obsidian/</code>?</dt>
+                <dd>A: It's strongly recommended NOT to add your <code>.obsidian/</code> folder to the ignore rules. This folder contains your vault's essential configuration, themes, snippets, and plugin data. While File Ignore could technically hide it, doing so would likely disrupt your vault's operation. If this happens, you might need to manually rename the folder back using your operating system's file explorer (outside of Obsidian) or, if accessible, use the "Show Files" feature with a specific rule targeting it.</dd>
+            </dl>
+        </section>
+
+        <hr>
+
+        <section id="final-cta">
+            <h2><i class="fa-solid fa-bolt"></i> Ready for a Faster, Cleaner Obsidian?</h2>
+            <p>Stop wrestling with slow performance and cluttered views. Install Obsidian File Ignore today and experience a more efficient and enjoyable vault.</p>
+            <div class="cta-buttons">
+                <a href="https://obsidian.md/plugins?id=file-ignore" class="button" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-download"></i> Install File Ignore Now</a>
+                <a href="https://github.com/feng6611/obsidian-file-ignore/issues" class="button button-secondary" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-comment"></i> Report an Issue / Suggest Feature</a>
+            </div>
         </section>
 
         <footer>
-            <p>&copy; 2024 | Licensed under the MIT License | <a href="https://github.com/feng6611/obsidian-file-ignore">File Ignore GitHub Repository</a></p>
+            <p>&copy; 2024 | Licensed under the MIT License | <a href="https://github.com/feng6611/obsidian-file-ignore" target="_blank" rel="noopener noreferrer">Obsidian File Ignore GitHub Repository</a></p>
+            <p class="keywords-footer">Keywords: Obsidian plugin, exclude folder, hide files, node_modules, .git, performance, speed up Obsidian, .gitignore for Obsidian, index control, obsidian hide file path</p>
         </footer>
     </div>
 </body>
