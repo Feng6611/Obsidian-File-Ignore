@@ -142,106 +142,132 @@ export class FileOperations {
     /**
      * 实际的文件处理逻辑（私有方法）
      */
-    private async _getFilesToProcess(rules: string[]): Promise<FileInfo[]> {
-        // 获取所有文件和文件夹
+    private async _getFilesToProcess(rulesText: string[]): Promise<FileInfo[]> {
         const allFiles = this.getAllFilesRecursively();
+        const parsedRules = this.parseRules(rulesText.join('\n'));
+
+        if (this.DEBUG) {
+            this.debug("Parsed rules:", parsedRules);
+        }
 
         const matchedItems = allFiles.filter(fileInfo => {
-            return rules.some(rule => {
-                // 如果是绝对路径规则（以 / 开头）
-                if (rule.startsWith('/')) {
-                    const pattern = rule.slice(1);
-                    // 创建两个模式：原始模式和带点前缀的模式
-                    const patterns = [pattern];
+            let lastMatchNegated: boolean | null = null;
+            const currentFilePath = fileInfo.path.replace(/\\/g, '/'); // Base path for logic
 
-                    // 如果模式不包含路径分隔符，或者最后一个分隔符后的部分不以点开头
-                    const lastSlashIndex = pattern.lastIndexOf('/');
-                    const fileName = lastSlashIndex === -1 ? pattern : pattern.slice(lastSlashIndex + 1);
-                    if (!fileName.startsWith('.')) {
-                        const dirPath = lastSlashIndex === -1 ? '' : pattern.slice(0, lastSlashIndex + 1);
-                        patterns.push(dirPath + '.' + fileName);
-                    }
+            for (const rule of parsedRules) {
+                let pattern = rule.pattern;
+                const isNegateRule = rule.negate;
 
-                    const matched = patterns.some(p => minimatch(fileInfo.path, p, {
-                        dot: true,
-                        nocase: true,
-                        matchBase: false,
-                        noglobstar: false
-                    }));
+                // 1. Handle directory-specific patterns (ending with /)
+                // (This check is mainly for how minimatch interprets the pattern,
+                // the path itself will be adjusted with a trailing slash later if needed)
+                // let isDirectoryRule = pattern.endsWith('/');
 
-                    if (matched && this.DEBUG) {
-                        this.debug(`绝对路径匹配成功 - 路径: ${fileInfo.path}, 规则: ${rule}`);
-                    }
-                    return matched;
+                // 2. Handle relative paths starting with ./
+                if (pattern.startsWith('./')) {
+                    pattern = pattern.substring(2);
                 }
 
-                // 创建匹配模式
-                const createPatterns = (pattern: string): string[] => {
-                    // 如果模式已经以点开头，只返回原模式
-                    if (pattern.startsWith('.')) {
-                        return [pattern];
-                    }
-                    // 否则返回原模式和带点版本
-                    return [pattern, '.' + pattern];
+                let isAbsolutePathRule = false;
+                if (pattern.startsWith('/')) {
+                    isAbsolutePathRule = true;
+                    pattern = pattern.substring(1); // Remove leading / for matching against relative vault path
+                }
+
+                // 3. If pattern does not contain a slash, and it's not an absolute path rule,
+                //    it should match in any directory. Prepend '**/' to achieve this.
+                if (!isAbsolutePathRule && !pattern.includes('/')) {
+                    pattern = '**/' + pattern;
+                }
+
+                // minimatch options
+                const minimatchOptions = {
+                    dot: true,       // Match dotfiles (e.g. .git) - allows * to match .file
+                    nocase: true,    // Case-insensitive matching
+                    matchBase: false // Pattern should match against the full path
                 };
 
-                // 如果规则以 / 结尾，匹配目录本身和带点前缀的目录
-                if (rule.endsWith('/')) {
-                    const basePattern = rule.slice(0, -1);
-                    const patterns = createPatterns(basePattern);
+                // Prepare the primary path to test against this rule
+                let primaryPathToTest = currentFilePath;
+                if (rule.pattern.endsWith('/') && fileInfo.isDirectory && !primaryPathToTest.endsWith('/')) {
+                    primaryPathToTest += '/';
+                }
 
-                    // 如果模式包含通配符但不是绝对路径，添加 **/ 前缀以匹配任意层级
-                    const finalPatterns = patterns.map(pattern => {
-                        if (pattern.includes('*') && !pattern.startsWith('/')) {
-                            return '**/' + pattern;
+                if (isNegateRule) {
+                    if (minimatch(primaryPathToTest, pattern, minimatchOptions)) {
+                        if (this.DEBUG) {
+                            this.debug(
+                                `File "${currentFilePath}" (${fileInfo.isDirectory ? 'dir' : 'file'}) NEGATIVELY matches rule "${rule.pattern}" (transformed: "${pattern}") on primary path.`
+                            );
                         }
-                        return pattern;
-                    });
-
-                    // 只匹配目录，且必须匹配其中一个模式
-                    const matched = fileInfo.isDirectory && finalPatterns.some(pattern =>
-                        minimatch(fileInfo.path, pattern, {
-                            dot: true,
-                            nocase: true,
-                            matchBase: false,
-                            noglobstar: false
-                        })
-                    );
-
-                    if (matched && this.DEBUG) {
-                        this.debug(`目录匹配成功 - 路径: ${fileInfo.path}/, 规则: ${rule}`);
+                        lastMatchNegated = true;
                     }
-                    return matched;
+                } else { // This is an inclusion rule
+                    let ruleMatchedThisFile = false;
+                    if (minimatch(primaryPathToTest, pattern, minimatchOptions)) {
+                        if (this.DEBUG) {
+                            this.debug(
+                                `File "${currentFilePath}" (${fileInfo.isDirectory ? 'dir' : 'file'}) matches rule "${rule.pattern}" (transformed: "${pattern}") on PRIMARY path.`
+                            );
+                        }
+                        ruleMatchedThisFile = true;
+                    } else {
+                        // Try alternate path (toggled dot version of the file's name)
+                        const fName = fileInfo.name;
+                        // Ensure fName is valid and not a dot-directory like '.' or '..'
+                        if (fName && fName !== '.' && fName !== '..') {
+                            const parentDir = path.dirname(currentFilePath); // path.dirname('foo.txt') is '.'
+
+                            const toggledFName = fName.startsWith('.') ? fName.substring(1) : '.' + fName;
+
+                            let alternateFilePath;
+                            // If parentDir is '.', the file is in the vault root.
+                            if (parentDir === '.' || parentDir === '') {
+                                alternateFilePath = toggledFName;
+                            } else {
+                                // Reconstruct path with forward slashes
+                                alternateFilePath = parentDir + '/' + toggledFName;
+                            }
+
+                            let alternatePathToTestAgainstRule = alternateFilePath;
+                            // Ensure trailing slash for directory matching if needed
+                            if (rule.pattern.endsWith('/') && fileInfo.isDirectory && !alternatePathToTestAgainstRule.endsWith('/')) {
+                                alternatePathToTestAgainstRule += '/';
+                            }
+
+                            if (minimatch(alternatePathToTestAgainstRule, pattern, minimatchOptions)) {
+                                if (this.DEBUG) {
+                                    this.debug(
+                                        `File "${currentFilePath}" (${fileInfo.isDirectory ? 'dir' : 'file'}) matches rule "${rule.pattern}" (transformed: "${pattern}") on ALTERNATE path "${alternatePathToTestAgainstRule}".`
+                                    );
+                                }
+                                ruleMatchedThisFile = true;
+                            }
+                        }
+                    }
+
+                    if (ruleMatchedThisFile) {
+                        lastMatchNegated = false;
+                    }
                 }
+            } // end rule loop
 
-                // 处理文件匹配
-                // 如果模式包含通配符但不是绝对路径，添加 **/ 前缀以匹配任意层级
-                const patterns = createPatterns(rule).map(pattern => {
-                    if ((pattern.includes('*') || !pattern.includes('/')) && !pattern.startsWith('/')) {
-                        return '**/' + pattern;
-                    }
-                    return pattern;
-                });
+            // If lastMatchNegated is null, no rules matched.
+            // If it's true, the last matching rule was a negation (exclude).
+            // If it's false, the last matching rule was an inclusion (include).
+            const shouldBeIncluded = lastMatchNegated === false;
 
-                // 匹配文件
-                const matched = !fileInfo.isDirectory && patterns.some(pattern =>
-                    minimatch(fileInfo.path, pattern, {
-                        dot: true,
-                        nocase: true,
-                        matchBase: false,
-                        noglobstar: false
-                    })
+            if (this.DEBUG && lastMatchNegated !== null) {
+                this.debug(
+                    `File "${currentFilePath}" final decision: ${shouldBeIncluded ? 'INCLUDE' : 'EXCLUDE'} (lastMatchNegated: ${lastMatchNegated})`
                 );
+            }
 
-                if (matched && this.DEBUG) {
-                    this.debug(`文件匹配成功 - 路径: ${fileInfo.path}, 规则: ${rule}`);
-                }
-                return matched;
-            });
+            return shouldBeIncluded;
         });
 
         if (this.DEBUG) {
-            this.debug(`匹配结果: ${matchedItems.length} 个项目:`,
+            this.debug(`Final matched items: ${matchedItems.length} items:`,
                 matchedItems.map(f => `${f.path}${f.isDirectory ? '/' : ''}`));
         }
 
@@ -249,70 +275,61 @@ export class FileOperations {
     }
 
     /**
-     * 添加或移除点前缀
+     * 重命名文件或文件夹，通过添加或移除点前缀。
+     * @param fileInfo 要操作的文件或文件夹的信息
+     * @param isAdd true 则添加点前缀（隐藏），false 则移除点前缀（显示）
+     * @returns Promise resolving to an object { success: boolean, error?: string }
      */
-    public async addDotPrefix(fileInfo: FileInfo, isAdd: boolean = true): Promise<void> {
+    public async addDotPrefix(fileInfo: FileInfo, isAdd: boolean = true): Promise<{ success: boolean; error?: string }> {
+        const currentPath = fileInfo.path;
+        const isDirectory = fileInfo.isDirectory;
         let newPath: string;
-        const displayPath = fileInfo.isDirectory ? fileInfo.path + '/' : fileInfo.path;
+
+        const baseName = path.basename(currentPath);
+        const dirName = path.dirname(currentPath);
 
         if (isAdd) {
-            if (fileInfo.name.startsWith('.')) {
-                this.debug(`${fileInfo.isDirectory ? '文件夹' : '文件'} ${displayPath} 已包含点前缀，跳过`);
-                return;
+            // Hide: Add dot if not present
+            if (baseName.startsWith('.')) {
+                this.debug(`File "${currentPath}" is already hidden. No action needed.`);
+                return { success: true }; // Considered success as no change is needed
             }
-
-            newPath = fileInfo.path.replace(/(.*\/)?([^/]+)/, (match, folder, name) => {
-                return (folder ?? '') + '.' + name;
-            });
-
-            this.debug(`添加点前缀: ${displayPath} -> ${newPath}${fileInfo.isDirectory ? '/' : ''}`);
+            newPath = path.join(dirName, '.' + baseName);
         } else {
-            if (!fileInfo.name.startsWith('.')) {
-                this.debug(`${fileInfo.isDirectory ? '文件夹' : '文件'} ${displayPath} 不含点前缀，跳过`);
-                return;
+            // Show: Remove dot if present
+            if (!baseName.startsWith('.')) {
+                this.debug(`File "${currentPath}" is already visible. No action needed.`);
+                return { success: true }; // Considered success as no change is needed
             }
+            newPath = path.join(dirName, baseName.substring(1));
+        }
 
-            newPath = fileInfo.path.replace(/(.*\/)?\.+([^/]+)/, (match, folder, name) => {
-                return (folder ?? '') + name;
-            });
+        // 确保路径分隔符统一为 Obsidian Vault 使用的 '/'
+        const vaultNewPath = newPath.replace(/\\/g, '/');
+        const vaultCurrentPath = currentPath.replace(/\\/g, '/');
 
-            this.debug(`移除点前缀: ${displayPath} -> ${newPath}${fileInfo.isDirectory ? '/' : ''}`);
+        if (vaultNewPath === vaultCurrentPath) {
+            this.debug(`New path "${vaultNewPath}" is identical to current path "${vaultCurrentPath}". No rename needed.`);
+            return { success: true };
         }
 
         try {
-            // 使用 LocalFileSystem 获取完整路径
-            const oldFullPath = this.localFs.getFullPath(fileInfo.path);
-            const newFullPath = this.localFs.getFullPath(newPath);
-
-            // 检查源文件是否存在
-            if (!fs.existsSync(oldFullPath)) {
-                throw new Error(`找不到文件: ${fileInfo.path}`);
+            this.debug(`Attempting to rename "${vaultCurrentPath}" to "${vaultNewPath}"`);
+            const file = this.vault.getAbstractFileByPath(vaultCurrentPath);
+            if (file) {
+                await this.vault.rename(file, vaultNewPath);
+                this.debug(`Successfully renamed "${vaultCurrentPath}" to "${vaultNewPath}"`);
+                this.operations.push({ oldPath: vaultCurrentPath, newPath: vaultNewPath, timestamp: Date.now() });
+                return { success: true };
+            } else {
+                const errorMsg = `File not found in Vault: "${vaultCurrentPath}"`;
+                this.debug(errorMsg);
+                return { success: false, error: errorMsg };
             }
-
-            // 检查目标路径是否已存在
-            if (fs.existsSync(newFullPath)) {
-                throw new Error(`目标文件已存在: ${newPath}`);
-            }
-
-            // 执行重命名操作
-            fs.renameSync(oldFullPath, newFullPath);
-
-            // 如果是非隐藏文件，也通过 Obsidian API 重命名以保持同步
-            if (!fileInfo.path.startsWith('.') && !newPath.startsWith('.')) {
-                const abstractFile = this.vault.getAbstractFileByPath(fileInfo.path);
-                if (abstractFile) {
-                    await this.vault.rename(abstractFile, newPath);
-                }
-            }
-
-            this.operations.push({
-                oldPath: fileInfo.path,
-                newPath: newPath,
-                timestamp: Date.now()
-            });
-        } catch (error) {
-            this.debug('重命名失败:', error);
-            throw error;
+        } catch (error: any) {
+            const errorMsg = `Error renaming "${vaultCurrentPath}" to "${vaultNewPath}": ${error.message}`;
+            this.debug(errorMsg, error);
+            return { success: false, error: errorMsg };
         }
     }
 
@@ -326,53 +343,62 @@ export class FileOperations {
             return;
         }
 
-        const lastBatch = this.operations.reduce((acc, op) => {
-            if (!acc.timestamp || Math.abs(op.timestamp - acc.timestamp) < 1000) {
-                acc.operations.push(op);
-                acc.timestamp = op.timestamp;
+        let batchToRollback: FileOperation[] = [];
+        if (this.operations.length > 0) {
+            const lastOpTimestamp = this.operations[this.operations.length - 1].timestamp;
+            let i = this.operations.length - 1;
+            while (i >= 0 && Math.abs(this.operations[i].timestamp - lastOpTimestamp) < 1500) {
+                batchToRollback.push(this.operations[i]);
+                i--;
             }
-            return acc;
-        }, { operations: [] as FileOperation[], timestamp: 0 });
+            // batchToRollback is currently in reverse order of application, which is correct for rollback iteration
+        } else {
+            // Should be caught by operations.length === 0 already
+            this.debug('No operations found for batching.');
+            return;
+        }
 
-        this.debug('Rolling back batch:', lastBatch);
+        if (batchToRollback.length === 0) {
+            this.debug('No suitable batch found for rollback based on timestamp.');
+            return;
+        }
 
-        for (const op of lastBatch.operations.reverse()) {
-            this.debug('Rolling back operation:', op);
+        this.debug('Rolling back batch containing operations:', batchToRollback.map(op => `${op.newPath} -> ${op.oldPath}`));
+
+        // Iterate in the order they were pushed to batch (which is reverse of application)
+        for (const op of batchToRollback) {
+            this.debug(`Attempting to roll back (FS): revert ${op.newPath} to ${op.oldPath}`);
             try {
-                const oldFullPath = this.localFs.getFullPath(op.oldPath);
-                const newFullPath = this.localFs.getFullPath(op.newPath);
+                const currentFullPath = this.localFs.getFullPath(op.newPath); // Path to rename FROM (current state)
+                const targetFullPath = this.localFs.getFullPath(op.oldPath); // Path to rename TO (original state)
 
-                // 检查源文件是否存在
-                if (!fs.existsSync(newFullPath)) {
-                    throw new Error(`找不到文件: ${op.newPath}`);
+                if (!fs.existsSync(currentFullPath)) {
+                    // If the file we expect to rename FROM doesn't exist, we might have a problem or it was already reverted.
+                    this.debug(`警告: 回滚源文件 ${op.newPath} (物理路径 ${currentFullPath}) 未找到. 可能已被回滚或删除。`);
+                    // We could choose to throw, or to continue if other operations might still be valid.
+                    // For now, let's log and attempt to remove this op from history assuming it was handled/irrelevant.
+                    continue; // Skip to next operation in batch
+                }
+                if (fs.existsSync(targetFullPath)) {
+                    throw new Error(`回滚目标文件 ${op.oldPath} (物理路径 ${targetFullPath}) 已存在.`);
                 }
 
-                // 检查目标路径是否已存在
-                if (fs.existsSync(oldFullPath)) {
-                    throw new Error(`目标文件已存在: ${op.oldPath}`);
-                }
+                fs.renameSync(currentFullPath, targetFullPath);
+                this.debug(`FS rollback successful: ${op.newPath} -> ${op.oldPath}`);
 
-                // 执行重命名操作
-                fs.renameSync(newFullPath, oldFullPath);
-
-                // 如果是非隐藏文件，也通过 Obsidian API 重命名以保持同步
-                if (!op.newPath.startsWith('.') && !op.oldPath.startsWith('.')) {
-                    const abstractFile = this.vault.getAbstractFileByPath(op.newPath);
-                    if (abstractFile) {
-                        await this.vault.rename(abstractFile, op.oldPath);
-                    }
-                }
-
-                this.debug('Successfully rolled back:', op.newPath, 'to', op.oldPath);
             } catch (error) {
-                this.debug('Failed to rollback:', op.newPath, error);
+                this.debug(`FS 回滚操作失败 for ${op.newPath} -> ${op.oldPath}:`, error);
+                // If one operation in the batch fails, we stop the whole batch rollback to avoid inconsistent state.
                 throw error;
             }
         }
 
-        // 移除已回滚的操作记录
-        this.operations = this.operations.slice(0, -lastBatch.operations.length);
-        this.debug('Remaining operations:', this.operations);
+        // Remove the successfully processed batch from operations history.
+        const numRolledBackActually = batchToRollback.length; // Assuming if loop completes, all in batch were attempted.
+        // Error thrown above will stop before this line.
+        this.operations.splice(this.operations.length - numRolledBackActually, numRolledBackActually);
+
+        this.debug('Rollback finished. Remaining operations:', this.operations);
     }
 
     /**

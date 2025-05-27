@@ -57,6 +57,8 @@ obsidian-file-igonre.kkuk.dev
 
 如果您在使用过程中遇到任何问题或有改进建议，欢迎访问我们的 [GitHub 仓库](https://github.com/feng6611/file-ignore) 提交 Issue
 
+您也可以通过给我买杯咖啡来支持我：[请我喝咖啡](https://buymeacoffee.com/RDzWpfRwLU)
+
 ## 📄 许可证 (License)
 
 本项目采用 MIT 许可证开源 - 详见 [LICENSE](LICENSE) 文件。

@@ -1,6 +1,8 @@
 export interface Translation {
     // 设置页面标题
     settingsTitle: string;
+    // 新增：设置页面顶部操作提示
+    settingsHeaderInfo?: string;
     // 应用规则按钮
     applyRules: {
         name: string;
@@ -25,8 +27,16 @@ export interface Translation {
         noMatches: string;
         matchedFiles: string;
         resetButton: string; // 重置按钮文本
-        allFilesButton: string; // 添加所有文件按钮文本
         rulesTitle: string; // 新增: Rules 输入框标题
+        manualApplyButton?: string; // 新增：手动应用按钮标题
+        manualApplyDesc?: string; // 新增：手动应用按钮描述
+        undoButton?: string; // 新增
+        redoButton?: string; // 新增
+        previousAppliedRuleTooltip?: string; // 新Tooltip
+        nextAppliedRuleTooltip?: string; // 新Tooltip
+        recentRulesTitle?: string; // 此键不再用于UI，但可能保留以防未来需要
+        loadButton?: string; // 此键不再用于UI
+        noRecentRules?: string; // 此键不再用于UI
     };
     // 命令名称 (新增)
     commands: {
@@ -58,11 +68,27 @@ export interface Translation {
         statusHidden: (count: number) => string;
         statusNotHidden: string;
         loading: string;
+        unknownError: string; // 新增: 通用未知错误
+        rollbackSuccess: string; // 新增: 回滚成功
+        rollbackError: (message: string) => string; // 新增: 回滚失败
+        noActionNeeded: string; // 新增: 无需操作
+        rulesAppliedAndScanned?: string; // 新增：规则已应用并扫描通知
+        ruleLoadedFromHistory?: string; // 新增
+    };
+    // 按钮文本 (新增)
+    buttons?: {
+        scanAndApply?: string;
+    };
+    // 新增：匹配文件列表下方的摘要信息
+    matchedListSummary?: {
+        itemsMatched: (count: number) => string;
+        itemsHidden: (count: number) => string;
     };
 }
 
 export const en: Translation = {
     settingsTitle: 'File Ignore Settings',
+    settingsHeaderInfo: "Click Hide/Show buttons to apply rules.",
     applyRules: {
         name: 'Hide files',
         desc: 'Add dot prefix to hide matched files',
@@ -89,8 +115,14 @@ export const en: Translation = {
         noMatches: 'No matching files',
         matchedFiles: 'Matched files',
         resetButton: 'Reset',
-        allFilesButton: 'Add all files',
         rulesTitle: 'Rules',
+        manualApplyButton: "Apply Rules & Scan",
+        manualApplyDesc: "Click to scan and display files matching the current rules.",
+        previousAppliedRuleTooltip: "Previous applied rule",
+        nextAppliedRuleTooltip: "Next applied rule",
+        recentRulesTitle: "Recently Used Rules",
+        loadButton: "Load",
+        noRecentRules: "No recent rules yet.",
     },
     commands: {
         applyRules: 'Apply ignore rules',
@@ -116,14 +148,28 @@ export const en: Translation = {
         folder: 'Folder',
         file: 'File',
         settingsErrorInit: 'FileOperations not initialized',
-        statusHidden: (count) => `${count} ${count === 1 ? 'item' : 'items'} matched and hidden`,
-        statusNotHidden: 'No matched items are hidden',
+        statusHidden: (count) => `${count} ${count === 1 ? 'item' : 'items'} matched and would be hidden`,
+        statusNotHidden: 'No matched items would be hidden',
         loading: 'Loading...',
+        unknownError: 'An unknown error occurred.',
+        rollbackSuccess: 'Rollback successful.',
+        rollbackError: (message) => `Rollback failed: ${message}`,
+        noActionNeeded: 'No files needed to be changed based on the current rules.',
+        rulesAppliedAndScanned: "Rules applied and files scanned!",
+        ruleLoadedFromHistory: "Rule loaded from history.",
+    },
+    buttons: {
+        scanAndApply: "Scan and Apply Rules",
+    },
+    matchedListSummary: {
+        itemsMatched: (count) => `${count} ${count === 1 ? 'item' : 'items'} matched`,
+        itemsHidden: (count) => `${count} ${count === 1 ? 'item' : 'items'} hidden`,
     },
 };
 
 export const zhCN: Translation = {
     settingsTitle: 'File Ignore 设置',
+    settingsHeaderInfo: '使用"隐藏/显示"按钮应用规则。匹配的文件将在右侧预览。',
     applyRules: {
         name: '隐藏文件',
         desc: '为匹配的文件添加点前缀以隐藏',
@@ -150,8 +196,16 @@ export const zhCN: Translation = {
         noMatches: '无匹配文件',
         matchedFiles: '匹配的文件',
         resetButton: '重置',
-        allFilesButton: '添加所有文件',
         rulesTitle: '规则',
+        manualApplyButton: "应用规则并扫描",
+        manualApplyDesc: "点击以根据当前规则扫描并显示匹配的文件。",
+        undoButton: "撤销",
+        redoButton: "重做",
+        previousAppliedRuleTooltip: "上一个应用的规则",
+        nextAppliedRuleTooltip: "下一个应用的规则",
+        recentRulesTitle: "最近使用的规则",
+        loadButton: "加载",
+        noRecentRules: "暂无最近规则。",
     },
     commands: {
         applyRules: '应用忽略规则',
@@ -177,14 +231,28 @@ export const zhCN: Translation = {
         folder: '文件夹',
         file: '文件',
         settingsErrorInit: 'FileOperations 未初始化',
-        statusHidden: (count) => `${count} 个匹配项已隐藏`,
-        statusNotHidden: '没有匹配项被隐藏',
+        statusHidden: (count) => `${count} 个匹配项将被隐藏`,
+        statusNotHidden: '没有匹配项会被隐藏',
         loading: '加载中...',
+        unknownError: '发生未知错误。',
+        rollbackSuccess: '回滚成功。',
+        rollbackError: (message) => `回滚失败: ${message}`,
+        noActionNeeded: '根据当前规则，没有文件需要更改。',
+        rulesAppliedAndScanned: "规则已应用且文件已扫描！",
+        ruleLoadedFromHistory: "已从历史记录加载规则。",
+    },
+    buttons: {
+        scanAndApply: "扫描并应用规则",
+    },
+    matchedListSummary: {
+        itemsMatched: (count) => `共 ${count} 个项目匹配`,
+        itemsHidden: (count) => `其中 ${count} 个项目已隐藏`,
     },
 };
 
 export const zhTW: Translation = {
     settingsTitle: 'File Ignore 設定',
+    settingsHeaderInfo: "使用「隱藏/顯示」按鈕套用規則。符合的檔案將在右側預覽。",
     applyRules: {
         name: '隱藏檔案',
         desc: '為符合的檔案加入點字首以隱藏',
@@ -203,21 +271,29 @@ export const zhTW: Translation = {
         title: '忽略規則',
         formatTitle: '規則格式（每行一條）：',
         formats: [
-            '檔案模式：test.md',
+            '檔案名稱：test.md',
             '根目錄：/readme.md',
             '資料夾：temp/',
             '萬用字元：*test/'
         ],
         noMatches: '無符合檔案',
         matchedFiles: '符合的檔案',
-        resetButton: '重置',
-        allFilesButton: '添加所有文件',
+        resetButton: '重設',
         rulesTitle: '規則',
+        manualApplyButton: "套用規則並掃描",
+        manualApplyDesc: "點擊以根據當前規則掃描並顯示符合的檔案。",
+        undoButton: "復原",
+        redoButton: "重做",
+        previousAppliedRuleTooltip: "上一個套用的規則",
+        nextAppliedRuleTooltip: "下一個套用的規則",
+        recentRulesTitle: "最近使用的規則",
+        loadButton: "載入",
+        noRecentRules: "暫無最近規則。",
     },
     commands: {
-        applyRules: '應用忽略規則',
-        addDot: '添加點前綴（隱藏）',
-        removeDot: '移除點前綴（顯示）',
+        applyRules: '套用忽略規則',
+        addDot: '新增點前綴（隱藏）',
+        removeDot: '移除點前缀（顯示）',
     },
     menu: {
         hide: '隱藏',
@@ -230,22 +306,36 @@ export const zhTW: Translation = {
         hideError: '隱藏失敗',
         showError: '顯示失敗',
         noRules: '沒有有效的規則',
-        noMatches: '沒有找到符合的檔案',
+        noMatches: '找不到符合的檔案',
         applied: (count) => `成功隱藏 ${count} 個項目`,
         reverted: (count) => `成功顯示 ${count} 個項目`,
-        applyError: (message) => `應用規則時出錯: ${message}`,
+        applyError: (message) => `套用規則時發生錯誤: ${message}`,
         listError: (message) => `列出目錄內容失敗: ${message}`,
         folder: '資料夾',
         file: '檔案',
         settingsErrorInit: 'FileOperations 未初始化',
-        statusHidden: (count) => `${count} 個符合項目已隱藏`,
-        statusNotHidden: '沒有符合項目被隱藏',
+        statusHidden: (count) => `${count} 個符合項目將被隱藏`,
+        statusNotHidden: '沒有符合項目會被隱藏',
         loading: '載入中...',
+        unknownError: '發生未知錯誤。',
+        rollbackSuccess: '還原成功。',
+        rollbackError: (message) => `還原失敗: ${message}`,
+        noActionNeeded: '根據目前規則，沒有檔案需要變更。',
+        rulesAppliedAndScanned: "規則已套用且檔案已掃描！",
+        ruleLoadedFromHistory: "已從歷史記錄載入規則。",
+    },
+    buttons: {
+        scanAndApply: "掃描並套用規則",
+    },
+    matchedListSummary: {
+        itemsMatched: (count) => `共 ${count} 個項目符合`,
+        itemsHidden: (count) => `其中 ${count} 個項目已隱藏`,
     },
 };
 
 export const ja: Translation = {
     settingsTitle: 'File Ignore 設定',
+    settingsHeaderInfo: "「表示/非表示」ボタンを使用してルールを適用します。一致したファイルは右側にプレビュー表示されます。",
     applyRules: {
         name: 'ファイルを隠す',
         desc: 'マッチしたファイルにドット接頭辞を追加して隠す',
@@ -272,8 +362,16 @@ export const ja: Translation = {
         noMatches: '一致するファイルがありません',
         matchedFiles: '一致したファイル',
         resetButton: 'リセット',
-        allFilesButton: 'すべてのファイルを追加',
         rulesTitle: 'ルール',
+        manualApplyButton: "ルールを適用してスキャン",
+        manualApplyDesc: "現在のルールに基づいてファイルをスキャンして表示するには、ここをクリックしてください。",
+        undoButton: "元に戻す",
+        redoButton: "やり直す",
+        previousAppliedRuleTooltip: "前に適用されたルール",
+        nextAppliedRuleTooltip: "次に適用されたルール",
+        recentRulesTitle: "最近使用したルール",
+        loadButton: "読み込む",
+        noRecentRules: "最近使用したルールはありません。",
     },
     commands: {
         applyRules: '無視ルールを適用',
@@ -286,22 +384,35 @@ export const ja: Translation = {
         loading: '読み込み中...',
     },
     notice: {
-        hidden: '{itemType}を隠しました',
-        shown: '{itemType}を表示しました',
-        hideError: '隠すのに失敗しました',
+        hidden: '{itemType} が非表示になりました',
+        shown: '{itemType} が表示されました',
+        hideError: '非表示に失敗しました',
         showError: '表示に失敗しました',
         noRules: '有効なルールがありません',
         noMatches: '一致するファイルが見つかりません',
-        applied: (count) => `正常に ${count} 個の項目を隠しました`,
-        reverted: (count) => `正常に ${count} 個の項目を表示しました`,
-        applyError: (message) => `ルール適用時にエラーが発生しました: ${message}`,
-        listError: (message) => `ディレクトリ内容のリスト表示に失敗しました: ${message}`,
+        applied: (count) => `${count} 個の項目を正常に非表示にしました`,
+        reverted: (count) => `${count} 個の項目を正常に表示しました`,
+        applyError: (message) => `ルールの適用中にエラーが発生しました: ${message}`,
+        listError: (message) => `ディレクトリの内容の表示に失敗しました: ${message}`,
         folder: 'フォルダ',
         file: 'ファイル',
-        settingsErrorInit: 'FileOperationsが初期化されていません',
-        statusHidden: (count) => `${count} 個の一致項目が非表示です`,
-        statusNotHidden: '一致する非表示項目はありません',
+        settingsErrorInit: 'FileOperations が初期化されていません',
+        statusHidden: (count) => `${count} 件の一致アイテムが非表示になります`,
+        statusNotHidden: '一致するアイテムは非表示になりません',
         loading: '読み込み中...',
+        unknownError: '不明なエラーが発生しました。',
+        rollbackSuccess: 'ロールバックに成功しました。',
+        rollbackError: (message) => `ロールバックに失敗しました: ${message}`,
+        noActionNeeded: '現在のルールに基づき、変更が必要なファイルはありません。',
+        rulesAppliedAndScanned: "ルールが適用され、ファイルがスキャンされました！",
+        ruleLoadedFromHistory: "履歴からルールを読み込みました。",
+    },
+    buttons: {
+        scanAndApply: "ルールを適用してスキャン",
+    },
+    matchedListSummary: {
+        itemsMatched: (count) => `合計 ${count} 件のアイテムが一致`,
+        itemsHidden: (count) => `うち ${count} 件のアイテムが非表示`,
     },
 };
 

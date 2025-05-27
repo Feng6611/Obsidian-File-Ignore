@@ -69,6 +69,8 @@ Recommended to use with the [Show-Hide-Files](https://github.com/polyipseity/obs
 
 If you encounter any issues or have suggestions for improvements, please visit our [GitHub repository](https://github.com/feng6611/file-ignore) to create an issue.
 
+You can also support me by buying me a coffee: [Buy Me A Coffee](https://buymeacoffee.com/RDzWpfRwLU)
+
 ## 📄 License
 
 This project is open-sourced under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -1,6 +1,6 @@
 import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, TFolder } from 'obsidian';
 import { FileOperations } from './fileOperations';
-import { FileIgnoreSettings, DEFAULT_SETTINGS, FileIgnoreSettingTab } from './settings';
+import { FileIgnoreSettingTab } from './settings';
 import { LocalFileSystem, FileInfo } from './localFileSystem';
 import { locales, type Translation } from './i18n/locales';
 import moment from 'moment';
@@ -10,11 +10,41 @@ interface FileSystemAdapterExtended {
     getBasePath(): string;
 }
 
+export interface FileIgnoreSettings {
+    rules: string;
+    ignoredFiles: string[];
+    debug?: boolean;
+    rulesHistory?: string[]; // 新增：存储最近应用的规则 (最多5条)
+}
+
+export const DEFAULT_SETTINGS: FileIgnoreSettings = {
+    rules: 'temp/\n*.tmp\n.DS_Store\n' + (process.platform === 'win32' ? 'Thumbs.db' : ''),
+    ignoredFiles: [],
+    debug: false,
+    rulesHistory: [], // 初始化为空数组
+};
+
 export default class FileIgnorePlugin extends Plugin {
     settings: FileIgnoreSettings;
     fileOps: FileOperations | undefined;
     localFs: LocalFileSystem | undefined;
     t: Translation;
+
+    private initTranslations() {
+        const obsidianLang = moment.locale();
+        let langKey: keyof typeof locales = 'en'; // Default to English
+
+        if (obsidianLang.startsWith('zh')) {
+            langKey = (obsidianLang === 'zh-tw' || obsidianLang === 'zh-hk') ? 'zh-TW' : 'zh-CN';
+        } else if (locales.hasOwnProperty(obsidianLang)) {
+            langKey = obsidianLang as keyof typeof locales;
+        }
+        this.t = locales[langKey];
+
+        if (this.settings.debug) {
+            console.log(`[file-ignore] Obsidian language: ${obsidianLang}, Using translation: ${langKey}`);
+        }
+    }
 
     async onload() {
         try {
@@ -29,7 +59,10 @@ export default class FileIgnorePlugin extends Plugin {
                 console.log('[file-ignore] 插件开始加载...');
             }
 
-            // 3. 初始化文件系统
+            // 3. 初始化国际化
+            this.initTranslations();
+
+            // 4. 初始化文件系统
             const adapter = (this.app.vault.adapter as unknown) as FileSystemAdapterExtended;
             const basePath = adapter.getBasePath();
 
@@ -39,33 +72,33 @@ export default class FileIgnorePlugin extends Plugin {
                 console.log('[file-ignore] LocalFileSystem 初始化完成, 根目录:', basePath);
             }
 
-            // 4. 初始化其他组件
+            // 5. 初始化其他组件
             this.fileOps = new FileOperations(this.app.vault);
             this.localFs = new LocalFileSystem(basePath);
 
-            // 5. 添加设置标签页
+            // 6. 添加设置标签页
             this.addSettingTab(new FileIgnoreSettingTab(this.app, this));
 
-            // 6. 初始化翻译 （新增）
-            const locale = moment.locale(); // <-- 使用 Obsidian 的 locale
+            // 7. 初始化翻译 （新增）
+            // const locale = moment.locale(); // <-- 使用 Obsidian 的 locale
 
-            if (locale.startsWith('zh')) {
-                if (locale === 'zh-tw' || locale === 'zh-hk') {
-                    this.t = locales['zh-TW'];
-                } else {
-                    this.t = locales['zh-CN'];
-                }
-            } else if (locale === 'ja') {
-                this.t = locales.ja;
-            } else {
-                this.t = locales.en;
-            }
-            if (this.settings.debug) {
-                console.log('[file-ignore] Main locale:', locale);
-            }
+            // if (locale.startsWith('zh')) {
+            //     if (locale === 'zh-tw' || locale === 'zh-hk') {
+            //         this.t = locales['zh-TW'];
+            //     } else {
+            //         this.t = locales['zh-CN'];
+            //     }
+            // } else if (locale === 'ja') {
+            //     this.t = locales.ja;
+            // } else {
+            //     this.t = locales.en;
+            // }
+            // if (this.settings.debug) {
+            //     console.log('[file-ignore] Main locale:', locale);
+            // }
 
             // 在这里添加 Notice 来显示检测到的 locale 和最终选择的翻译键
-            const usedLocaleKey = Object.keys(locales).find(key => locales[key] === this.t) || 'unknown';
+            // const usedLocaleKey = Object.keys(locales).find(key => locales[key] === this.t) || 'unknown';
             // new Notice(`Detected: ${locale}, Using: ${usedLocaleKey}`); // <-- 移除测试 Notice
 
             // 添加命令
@@ -73,7 +106,7 @@ export default class FileIgnorePlugin extends Plugin {
                 id: 'apply-ignore-rules',
                 name: this.t.commands.applyRules,
                 callback: async () => {
-                    await this.applyRules();
+                    await this.applyRules(true);
                 },
             });
 
@@ -148,14 +181,36 @@ export default class FileIgnorePlugin extends Plugin {
 
     async loadSettings() {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        if (!this.settings.rulesHistory) {
+            this.settings.rulesHistory = [];
+        }
     }
 
-    async saveSettings() {
-        await this.saveData(this.settings);
-        if (this.fileOps) {
-            this.fileOps.setDebug(this.settings.debug);
+    async saveSettings(rulesToSave?: string, addToHistory: boolean = false) {
+        if (rulesToSave !== undefined) {
+            this.settings.rules = rulesToSave;
         }
-        // 触发设置更新
+
+        // 只在 addToHistory 为 true，并且 settings.rules 有实际内容时才操作历史记录
+        if (addToHistory && this.settings.rules && this.settings.rules.trim() !== "") {
+            if (!this.settings.rulesHistory) {
+                this.settings.rulesHistory = [];
+            }
+            // 移除历史中已存在的相同规则，再添加到最前面
+            this.settings.rulesHistory = this.settings.rulesHistory.filter(r => r !== this.settings.rules);
+            this.settings.rulesHistory.unshift(this.settings.rules);
+
+            // 保持历史记录最多为5条
+            if (this.settings.rulesHistory.length > 5) {
+                this.settings.rulesHistory = this.settings.rulesHistory.slice(0, 5);
+            }
+        }
+
+        await this.saveData(this.settings);
+
+        if (this.fileOps) {
+            this.fileOps.setDebug(this.settings.debug || false);
+        }
         this.app.workspace.trigger('file-ignore:settings-update');
     }
 
@@ -190,56 +245,78 @@ export default class FileIgnorePlugin extends Plugin {
         }
     }
 
-    async applyRules(isAdd: boolean = true) {
+    async applyRules(hide: boolean) {
+        if (!this.fileOps) {
+            new Notice(this.t.notice.settingsErrorInit);
+            return;
+        }
         try {
-            if (!this.fileOps) {
-                throw new Error('FileOperations 未初始化');
-            }
+            const currentRulesText = this.settings.rules; // 获取当前规则文本以供保存到历史
+            const currentRulesArray = currentRulesText.split('\n')
+                .map(line => line.trim())
+                .filter(line => line && !line.startsWith('#'));
 
-            const rules = this.settings.rules
-                .split('\n')
-                .map((line: string) => line.trim())
-                .filter((line: string) => line && !line.startsWith('#'));
-
-            if (!rules.length) {
+            if (currentRulesArray.length === 0) {
                 new Notice(this.t.notice.noRules);
                 return;
             }
 
-            const files = await this.fileOps.getFilesToProcess(rules);
-
-            // 只输出匹配结果
-            console.log('[file-ignore] 匹配到的文件:',
-                files.map(f => f.isDirectory ? f.path + '/' : f.path));
-
-            if (files.length === 0) {
+            const filesToProcess = await this.fileOps.getFilesToProcess(currentRulesArray);
+            if (filesToProcess.length === 0) {
                 new Notice(this.t.notice.noMatches);
                 return;
             }
 
-            for (const file of files) {
-                await this.fileOps.addDotPrefix(file, isAdd);
+            let changedCount = 0;
+            let result: { success: boolean; error?: string } | undefined;
+
+            for (const fileInfo of filesToProcess) {
+                const shouldHide = hide && !fileInfo.path.startsWith('.');
+                const shouldShow = !hide && fileInfo.path.startsWith('.');
+                result = undefined;
+
+                if (shouldHide) {
+                    result = await this.fileOps.addDotPrefix(fileInfo, true);
+                } else if (shouldShow) {
+                    result = await this.fileOps.addDotPrefix(fileInfo, false);
+                }
+
+                if (result) {
+                    if (result.success) {
+                        changedCount++;
+                    } else {
+                        const errorMessage = result.error || this.t.notice.unknownError || 'Unknown error during file operation';
+                        new Notice(`${this.t.notice[hide ? 'hideError' : 'showError']} ${fileInfo.path}: ${errorMessage}`);
+                    }
+                }
             }
 
-            const noticeMessage = isAdd ? this.t.notice.applied(files.length) : this.t.notice.reverted(files.length);
-            new Notice(noticeMessage);
-            // 请求 Obsidian 刷新文件列表
-            this.app.workspace.requestSaveLayout();
+            if (changedCount > 0) {
+                new Notice(hide ? this.t.notice.applied(changedCount) : this.t.notice.reverted(changedCount));
+                // 既然规则被实际应用并导致了文件更改，确保当前规则在历史记录中
+                // 使用 currentRulesText，因为 this.settings.rules 可能在异步操作中被其他地方修改
+                await this.saveSettings(currentRulesText, true);
+            } else {
+                new Notice(this.t.notice.noActionNeeded);
+            }
+
         } catch (error) {
-            console.error('[file-ignore] 应用规则时出错:', error);
+            console.error('[file-ignore] Error in applyRules:', error);
             new Notice(this.t.notice.applyError(error.message));
-            throw error;
         }
     }
 
     async rollback() {
         try {
+            // Assuming fileOps.rollback() handles the core logic of undoing changes.
             await this.fileOps?.rollback();
-            // 请求 Obsidian 刷新文件列表
-            this.app.workspace.trigger('file-menu');
+            new Notice(this.t.notice.rollbackSuccess);
+            // Correctly refresh the file explorer
+            this.app.workspace.requestSaveLayout();
         } catch (error) {
-            console.error('回滚操作失败:', error);
-            throw error;
+            console.error('[file-ignore] Rollback operation failed:', error);
+            new Notice(this.t.notice.rollbackError(error.message || this.t.notice.unknownError));
+            // Do not rethrow here for the same reasons as applyRules
         }
     }
 } 

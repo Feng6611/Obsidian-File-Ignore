@@ -43,3 +43,5 @@ yarn-error.log*
 # 操作系统生成的文件
 Thumbs.db
 desktop.ini
+
+/.cursor/
