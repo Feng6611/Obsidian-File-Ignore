@@ -1,7 +1,7 @@
 # 📁 File Ignore
 
 An Obsidian plugin that controls file indexing by managing dot prefixes (hidden attributes) on files/folders, providing a `.gitignore`-like experience.
-obsidian-file-igonre.kkuk.dev
+obsidian-file-ignore.kkuk.dev
 
 English | [简体中文](README-zh.md)
 
@@ -65,9 +65,22 @@ Configure your ignore rules in Obsidian's `Settings` -> `Community plugins` -> `
 
 Recommended to use with the [Show-Hide-Files](https://github.com/polyipseity/obsidian-show-hidden-files) plugin for better management (viewing or manipulating) of files hidden by this plugin.
 
+## 🔒 Safety Notes
+
+- File Ignore never deletes content. Hide/Show only renames entries by toggling a leading dot, and protected areas such as `.obsidian/`, `.git/`, and `.trash/` are skipped automatically.
+- When the destination name already exists (for example, both `foo.md` and `.foo.md` are present), the plugin aborts the rename and emits an audit log instead of overwriting either file.
+- Each rename records a `[file-ignore][audit]` line in the developer console, making it easy to trace which paths were changed if something looks wrong.
+
+## 🧪 Debugging & Troubleshooting
+
+1. Open `Settings → Community plugins → File Ignore`.
+2. Enable **Debug logging** to stream detailed diagnostics.
+3. Use `View → Toggle Developer Tools` and inspect the **Console** tab; look for `[file-ignore][audit]` entries detailing hide/show batches, skipped items, and failures.
+4. Disable the toggle after finishing—normal operation stays quiet unless a warning or error occurs.
+
 ## 🤝 Support
 
-If you encounter any issues or have suggestions for improvements, please visit our [GitHub repository](https://github.com/feng6611/file-ignore) to create an issue.
+If you encounter any issues or have suggestions for improvements, please visit our [GitHub repository](https://github.com/Feng6611/Obsidian-File-Ignore) to create an issue.
 
 You can also support me by buying me a coffee: [Buy Me A Coffee](https://buymeacoffee.com/RDzWpfRwLU)
 

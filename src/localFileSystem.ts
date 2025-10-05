@@ -25,17 +25,28 @@ export class LocalFileSystem {
         try {
             // 修改 readdirSync 选项，包含隐藏文件
             const items = fs.readdirSync(fullPath, { withFileTypes: true });
-            return items.map(item => {
+            const result: FileInfo[] = [];
+            for (const item of items) {
                 const itemPath = path.join(relativePath, item.name);
-                return {
-                    name: item.name,
-                    path: itemPath.replace(/\\/g, '/'),  // 统一使用正斜杠
-                    isDirectory: item.isDirectory(),
-                    stats: fs.statSync(path.join(fullPath, item.name))
-                };
-            });
+                const fsPath = path.join(fullPath, item.name);
+                try {
+                    // 使用 lstatSync 避免跟随可能失效或指向系统路径的符号链接
+                    const st = fs.lstatSync(fsPath);
+                    result.push({
+                        name: item.name,
+                        path: itemPath.replace(/\\/g, '/'),  // 统一使用正斜杠
+                        isDirectory: item.isDirectory(),
+                        stats: st
+                    });
+                } catch (e) {
+                    // 无法读取（例如断开的符号链接），跳过该项但不中断遍历
+                    console.warn(`[file-ignore] Skipping unreadable item: ${fsPath}`, e);
+                    continue;
+                }
+            }
+            return result;
         } catch (error) {
-            console.error(`读取目录失败 ${fullPath}:`, error);
+            console.error(`[file-ignore] Failed to read directory ${fullPath}:`, error);
             return [];
         }
     }
@@ -68,7 +79,7 @@ export class LocalFileSystem {
             const fullPath = path.join(this.basePath, relativePath);
             return fs.readFileSync(fullPath, 'utf8');
         } catch (error) {
-            console.error('读取文件失败:', error);
+            console.error('[file-ignore] Failed to read file:', error);
             throw error;
         }
     }
@@ -83,7 +94,7 @@ export class LocalFileSystem {
             const fullPath = path.join(this.basePath, relativePath);
             return fs.statSync(fullPath).isDirectory();
         } catch (error) {
-            console.error('检查目录失败:', error);
+            console.error('[file-ignore] Failed to check directory:', error);
             throw error;
         }
     }
@@ -104,7 +115,7 @@ export class LocalFileSystem {
                 stats: stats
             };
         } catch (error) {
-            console.error('获取文件信息失败:', error);
+            console.error('[file-ignore] Failed to get file info:', error);
             throw error;
         }
     }

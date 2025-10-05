@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, TextAreaComponent, ButtonComponent, Notice } from 'obsidian';
+import { App, PluginSettingTab, Setting, TextAreaComponent, ButtonComponent, Notice, Modal } from 'obsidian';
 import type FileIgnorePlugin from './main';
 import { locales, type Translation } from './i18n/locales';
 import { debounce } from "obsidian";
@@ -191,7 +191,29 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
             .setCta()
             .setTooltip(this.t.applyRules.desc)
             .onClick(async () => {
-                await this.plugin.applyRules(true);
+                // 确保使用当前文本框中的规则立即执行
+                await this.plugin.saveSettings(this.rulesTextArea.getValue());
+                const currentRules = this.plugin.settings.rules.split('\n')
+                    .map((line: string) => line.trim())
+                    .filter((line: string) => line && !line.startsWith('#'));
+                if (!this.plugin.fileOps) return;
+                const matched = await this.plugin.fileOps.getFilesToProcess(currentRules);
+                const actionable = matched.filter(f => !this.plugin.fileOps!.isProtectedPath(f.path));
+                const skipped = matched.length - actionable.length;
+                if (actionable.length === 0) {
+                    new Notice(this.t.notice.noActionNeeded);
+                    return;
+                }
+                const ok = await this.confirmAction(true, actionable, skipped);
+                if (!ok) {
+                    this.updateDisplayAsync();
+                    return;
+                }
+                await this.plugin.applyRules(true, {
+                    matches: matched,
+                    actionable: actionable,
+                    skippedProtected: skipped
+                });
                 this.updateDisplayAsync();
             });
 
@@ -199,7 +221,29 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
             .setButtonText(this.t.revertRules.button)
             .setTooltip(this.t.revertRules.desc)
             .onClick(async () => {
-                await this.plugin.applyRules(false);
+                // 确保使用当前文本框中的规则立即执行
+                await this.plugin.saveSettings(this.rulesTextArea.getValue());
+                const currentRules = this.plugin.settings.rules.split('\n')
+                    .map((line: string) => line.trim())
+                    .filter((line: string) => line && !line.startsWith('#'));
+                if (!this.plugin.fileOps) return;
+                const matched = await this.plugin.fileOps.getFilesToProcess(currentRules);
+                const actionable = matched.filter(f => !this.plugin.fileOps!.isProtectedPath(f.path));
+                const skipped = matched.length - actionable.length;
+                if (actionable.length === 0) {
+                    new Notice(this.t.notice.noActionNeeded);
+                    return;
+                }
+                const ok = await this.confirmAction(false, actionable, skipped);
+                if (!ok) {
+                    this.updateDisplayAsync();
+                    return;
+                }
+                await this.plugin.applyRules(false, {
+                    matches: matched,
+                    actionable: actionable,
+                    skippedProtected: skipped
+                });
                 this.updateDisplayAsync();
             });
 
@@ -217,13 +261,14 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         const mainContainer = containerEl.createDiv('file-ignore-main-row-container');
         const leftPanel = mainContainer.createDiv('file-ignore-input-panel');
         const leftTitleContainer = leftPanel.createDiv('file-ignore-panel-title-container');
-        leftTitleContainer.createEl('p', { text: 'Rules', cls: 'setting-item-name file-ignore-panel-title' });
+        leftTitleContainer.createEl('p', { text: this.t.ignoreRules.rulesTitle, cls: 'setting-item-name file-ignore-panel-title' });
 
         // 添加主操作按钮到标题栏
         const titleActionContainer = leftTitleContainer.createDiv('file-ignore-title-actions');
         new ButtonComponent(titleActionContainer)
-            .setButtonText('Search')
+            .setButtonText(this.t.ignoreRules.searchButton)
             .setCta()
+            .setTooltip(this.t.ignoreRules.searchTooltip || '')
             .onClick(async () => {
                 await this.plugin.saveSettings(this.rulesTextArea.getValue());
                 this.appliedRulesHistoryIndex = (this.plugin.settings.rulesHistory || []).indexOf(this.rulesTextArea.getValue());
@@ -251,8 +296,8 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
             .onClick(() => { this.loadNextAppliedRule(); });
 
         new ButtonComponent(navContainer)
-            .setButtonText('Reset')
-            .setTooltip('Restore default rules')
+            .setButtonText(this.t.ignoreRules.resetButton)
+            .setTooltip(this.t.ignoreRules.resetTooltip)
             .setClass('file-ignore-nav-button')
             .onClick(() => {
                 const defaultValue = DEFAULT_SETTINGS.rules;
@@ -266,7 +311,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         this.rulesTextArea = new TextAreaComponent(textAreaContainer);
         this.rulesTextArea.inputEl.addClass('file-ignore-rules-textarea');
         this.rulesTextArea.inputEl.setAttribute('rows', '20');
-        this.rulesTextArea.inputEl.setAttribute('placeholder', '输入规则，每行一个');
+        this.rulesTextArea.inputEl.setAttribute('placeholder', this.t.ignoreRules.rulesPlaceholder);
         // Populate with the current rules, which might have been updated by saveSettings
         this.rulesTextArea.setValue(this.plugin.settings.rules || DEFAULT_SETTINGS.rules);
 
@@ -293,16 +338,32 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         this.updateDisplayAsync();
 
         // --- Add Buy Me A Coffee Link ---
-        const supportSetting = new Setting(containerEl)
-            .setName('Support the Developer')
-            .setDesc('If you find this plugin helpful, consider supporting its development.')
-            .addButton(button => button
-                .setButtonText('Buy Me a Coffee')
-                .onClick(() => {
-                    window.open('https://buymeacoffee.com/RDzWpfRwLU', '_blank');
-                }));
-        supportSetting.controlEl.addClass('file-ignore-support-button-container');
+        if (this.t.support) {
+            const support = this.t.support;
+            const supportSetting = new Setting(containerEl)
+                .setName(support.name)
+                .setDesc(support.desc)
+                .addButton(button => button
+                    .setButtonText(support.button)
+                    .onClick(() => {
+                        window.open('https://buymeacoffee.com/RDzWpfRwLU', '_blank');
+                    }));
+            supportSetting.controlEl.addClass('file-ignore-support-button-container');
+        }
         // --- End Buy Me A Coffee Link ---
+
+        new Setting(containerEl)
+            .setName(this.t.debugToggle?.name ?? 'Debug logging')
+            .setDesc(this.t.debugToggle?.desc ?? 'Write detailed diagnostics to the developer console.')
+            .addToggle(toggle => {
+                toggle.setValue(this.plugin.settings.debug ?? false);
+                toggle.onChange(async value => {
+                    this.plugin.settings.debug = value;
+                    this.plugin.fileOps?.setDebug(value);
+                    await this.plugin.saveSettings(undefined);
+                    console.info('[file-ignore][audit]', value ? 'debug-enabled' : 'debug-disabled');
+                });
+            });
     }
 
     private showLoading(container: HTMLElement) {
@@ -377,6 +438,33 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         });
     }
 
+    private async confirmAction(hide: boolean, actionable: FileInfo[], skippedCount: number): Promise<boolean> {
+        const title = hide ? (this.t.confirm?.titleHide || 'Confirm Hide') : (this.t.confirm?.titleShow || 'Confirm Show');
+        const summaryFn = hide ? this.t.confirm?.summaryHide : this.t.confirm?.summaryShow;
+        const summary = (summaryFn || ((c: number) => hide ? `Add a dot prefix to ${c} item(s).` : `Remove the dot prefix from ${c} item(s).`))(actionable.length);
+        const protectedWarning = skippedCount > 0 ? (this.t.confirm?.protectedWarning || ((c: number) => `${c} protected item(s) will be skipped`))(skippedCount) : '';
+
+        return await new Promise<boolean>((resolve) => {
+            const modal = new class extends Modal {
+                constructor(app: App) { super(app); }
+                onOpen() {
+                    const { contentEl } = this;
+                    contentEl.empty();
+                    contentEl.createEl('h3', { text: title });
+                    contentEl.createEl('p', { text: summary });
+                    if (protectedWarning) contentEl.createEl('p', { text: protectedWarning, cls: 'mod-warning' });
+                    const btns = contentEl.createDiv({ cls: 'modal-button-container' });
+                    new ButtonComponent(btns).setButtonText((this as any).t?.confirm?.proceed || 'Proceed')
+                        .setCta().onClick(() => { this.close(); resolve(true); });
+                    new ButtonComponent(btns).setButtonText((this as any).t?.confirm?.cancel || 'Cancel')
+                        .onClick(() => { this.close(); resolve(false); });
+                }
+            }(this.app);
+            (modal as any).t = this.t; // pass translation
+            modal.open();
+        });
+    }
+
     private renderStatusInfo(container: HTMLElement, hiddenCount: number | null, error: Error | null) {
         container.empty();
         const statusEl = container.createDiv('file-ignore-status-info');
@@ -393,4 +481,4 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
             textContainer.setText(this.t.settingsHeaderInfo || 'Click Hide/Show buttons to apply rules.');
         }
     }
-} 
+}

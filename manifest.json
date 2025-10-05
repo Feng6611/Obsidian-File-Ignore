@@ -1,7 +1,7 @@
 {
     "id": "file-ignore",
     "name": "File Ignore",
-    "version": "0.4.0",
+    "version": "1.0.0",
     "minAppVersion": "0.15.0",
     "description": "Control file indexing by adding or removing dot prefix to show or hide files, providing a .gitignore-like experience",
     "main": "main.js",

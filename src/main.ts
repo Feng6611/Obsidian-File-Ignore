@@ -42,7 +42,7 @@ export default class FileIgnorePlugin extends Plugin {
         this.t = locales[langKey];
 
         if (this.settings.debug) {
-            console.log(`[file-ignore] Obsidian language: ${obsidianLang}, Using translation: ${langKey}`);
+            console.debug(`[file-ignore] Obsidian language: ${obsidianLang}, Using translation: ${langKey}`);
         }
     }
 
@@ -56,7 +56,7 @@ export default class FileIgnorePlugin extends Plugin {
 
             // 2. 现在可以安全地使用 settings 了
             if (this.settings.debug) {
-                console.log('[file-ignore] 插件开始加载...');
+                console.debug('[file-ignore] Plugin loading started');
             }
 
             // 3. 初始化国际化
@@ -67,9 +67,9 @@ export default class FileIgnorePlugin extends Plugin {
             const basePath = adapter.getBasePath();
 
             if (this.settings.debug) {
-                console.log('[file-ignore] 设置加载完成:', this.settings);
-                console.log('[file-ignore] FileOperations 初始化完成');
-                console.log('[file-ignore] LocalFileSystem 初始化完成, 根目录:', basePath);
+                console.debug('[file-ignore] Settings loaded:', this.settings);
+                console.debug('[file-ignore] FileOperations initialized');
+                console.debug('[file-ignore] LocalFileSystem initialized, base path:', basePath);
             }
 
             // 5. 初始化其他组件
@@ -101,73 +101,17 @@ export default class FileIgnorePlugin extends Plugin {
             // const usedLocaleKey = Object.keys(locales).find(key => locales[key] === this.t) || 'unknown';
             // new Notice(`Detected: ${locale}, Using: ${usedLocaleKey}`); // <-- 移除测试 Notice
 
-            // 添加命令
-            this.addCommand({
-                id: 'apply-ignore-rules',
-                name: this.t.commands.applyRules,
-                callback: async () => {
-                    await this.applyRules(true);
-                },
-            });
-
-            this.addCommand({
-                id: 'add-dot-prefix',
-                name: this.t.commands.addDot,
-                checkCallback: (checking: boolean) => {
-                    const file = this.app.workspace.getActiveFile();
-                    if (file) {
-                        if (!checking) {
-                            this.addDotPrefix(file);
-                        }
-                        return true;
-                    }
-                    return false;
-                }
-            });
-
-            this.addCommand({
-                id: 'remove-dot-prefix',
-                name: this.t.commands.removeDot,
-                checkCallback: (checking: boolean) => {
-                    const file = this.app.workspace.getActiveFile();
-                    if (file) {
-                        if (!checking) {
-                            this.removeDotPrefix(file);
-                        }
-                        return true;
-                    }
-                    return false;
-                }
-            });
-
-            // 添加右键菜单
-            this.registerEvent(
-                this.app.workspace.on('file-menu', (menu, file) => {
-                    if (file instanceof TFile || file instanceof TFolder) {
-                        menu.addItem((item) => {
-                            const isHidden = file.path.startsWith('.');
-                            item
-                                .setTitle(isHidden ? this.t.menu.show : this.t.menu.hide)
-                                .setIcon(isHidden ? 'eye' : 'eye-off')
-                                .onClick(async () => {
-                                    if (isHidden) {
-                                        await this.removeDotPrefix(file);
-                                    } else {
-                                        await this.addDotPrefix(file);
-                                    }
-                                });
-                        });
-                    }
-                })
-            );
+            // 按要求：删除设置页之外的所有操作入口（命令/右键菜单）。
         } catch (error) {
-            console.error('[file-ignore] 插件加载出错:', error);
+            console.error('[file-ignore] Plugin loading error:', error);
         }
     }
 
     onunload() {
         // 清理工作
-        console.log('[file-ignore] 插件正在卸载...');
+        if (this.settings?.debug) {
+            console.debug('[file-ignore] Plugin unloading...');
+        }
         // 清理文件操作实例
         if (this.fileOps) {
             this.fileOps = undefined;
@@ -176,7 +120,9 @@ export default class FileIgnorePlugin extends Plugin {
         if (this.localFs) {
             this.localFs = undefined;
         }
-        console.log('[file-ignore] 插件卸载完成');
+        if (this.settings?.debug) {
+            console.debug('[file-ignore] Plugin unloaded');
+        }
     }
 
     async loadSettings() {
@@ -225,7 +171,7 @@ export default class FileIgnorePlugin extends Plugin {
                 this.app.workspace.requestSaveLayout();
             }
         } catch (error) {
-            console.error('隐藏失败:', error);
+            console.error('[file-ignore] Hide operation failed:', error);
             new Notice(this.t.notice.hideError);
         }
     }
@@ -240,12 +186,12 @@ export default class FileIgnorePlugin extends Plugin {
                 this.app.workspace.requestSaveLayout();
             }
         } catch (error) {
-            console.error('显示失败:', error);
+            console.error('[file-ignore] Show operation failed:', error);
             new Notice(this.t.notice.showError);
         }
     }
 
-    async applyRules(hide: boolean) {
+    async applyRules(hide: boolean, precomputed?: { matches?: FileInfo[]; actionable?: FileInfo[]; skippedProtected?: number }) {
         if (!this.fileOps) {
             new Notice(this.t.notice.settingsErrorInit);
             return;
@@ -261,18 +207,22 @@ export default class FileIgnorePlugin extends Plugin {
                 return;
             }
 
-            const filesToProcess = await this.fileOps.getFilesToProcess(currentRulesArray);
+            const filesToProcess: FileInfo[] = precomputed?.matches ?? await this.fileOps.getFilesToProcess(currentRulesArray);
+            const actionable: FileInfo[] = precomputed?.actionable ?? filesToProcess.filter(f => !this.fileOps!.isProtectedPath(f.path));
+            const skippedProtected = precomputed?.skippedProtected ?? (filesToProcess.length - actionable.length);
             if (filesToProcess.length === 0) {
                 new Notice(this.t.notice.noMatches);
                 return;
             }
 
             let changedCount = 0;
+            let processedCount = 0;
             let result: { success: boolean; error?: string } | undefined;
 
-            for (const fileInfo of filesToProcess) {
-                const shouldHide = hide && !fileInfo.path.startsWith('.');
-                const shouldShow = !hide && fileInfo.path.startsWith('.');
+            for (const fileInfo of actionable) {
+                const isCurrentlyHidden = fileInfo.name.startsWith('.');
+                const shouldHide = hide && !isCurrentlyHidden;
+                const shouldShow = !hide && isCurrentlyHidden;
                 result = undefined;
 
                 if (shouldHide) {
@@ -289,6 +239,11 @@ export default class FileIgnorePlugin extends Plugin {
                         new Notice(`${this.t.notice[hide ? 'hideError' : 'showError']} ${fileInfo.path}: ${errorMessage}`);
                     }
                 }
+
+                processedCount++;
+                if (processedCount % 25 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
             }
 
             if (changedCount > 0) {
@@ -296,9 +251,24 @@ export default class FileIgnorePlugin extends Plugin {
                 // 既然规则被实际应用并导致了文件更改，确保当前规则在历史记录中
                 // 使用 currentRulesText，因为 this.settings.rules 可能在异步操作中被其他地方修改
                 await this.saveSettings(currentRulesText, true);
+                if (skippedProtected > 0 && this.t.notice.protectedSkipped) {
+                    new Notice(this.t.notice.protectedSkipped(skippedProtected));
+                }
             } else {
-                new Notice(this.t.notice.noActionNeeded);
+                if (skippedProtected > 0 && this.t.notice.protectedSkipped) {
+                    new Notice(this.t.notice.protectedSkipped(skippedProtected));
+                } else {
+                    new Notice(this.t.notice.noActionNeeded);
+                }
             }
+
+            console.info('[file-ignore][audit]', 'batch-summary', {
+                action: hide ? 'hide' : 'show',
+                totalMatched: filesToProcess.length,
+                actionable: actionable.length,
+                changed: changedCount,
+                skippedProtected
+            });
 
         } catch (error) {
             console.error('[file-ignore] Error in applyRules:', error);

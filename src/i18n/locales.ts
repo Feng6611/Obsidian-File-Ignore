@@ -27,16 +27,13 @@ export interface Translation {
         noMatches: string;
         matchedFiles: string;
         resetButton: string; // 重置按钮文本
-        rulesTitle: string; // 新增: Rules 输入框标题
-        manualApplyButton?: string; // 新增：手动应用按钮标题
-        manualApplyDesc?: string; // 新增：手动应用按钮描述
-        undoButton?: string; // 新增
-        redoButton?: string; // 新增
+        resetTooltip: string; // 重置按钮提示
+        rulesTitle: string; // Rules 输入框标题
+        rulesPlaceholder: string; // 规则输入框占位符
+        searchButton: string; // 搜索按钮
+        searchTooltip?: string; // 搜索按钮提示
         previousAppliedRuleTooltip?: string; // 新Tooltip
         nextAppliedRuleTooltip?: string; // 新Tooltip
-        recentRulesTitle?: string; // 此键不再用于UI，但可能保留以防未来需要
-        loadButton?: string; // 此键不再用于UI
-        noRecentRules?: string; // 此键不再用于UI
     };
     // 命令名称 (新增)
     commands: {
@@ -74,6 +71,7 @@ export interface Translation {
         noActionNeeded: string; // 新增: 无需操作
         rulesAppliedAndScanned?: string; // 新增：规则已应用并扫描通知
         ruleLoadedFromHistory?: string; // 新增
+        protectedSkipped?: (count: number) => string; // 新增: 受保护路径跳过提示
     };
     // 按钮文本 (新增)
     buttons?: {
@@ -83,6 +81,26 @@ export interface Translation {
     matchedListSummary?: {
         itemsMatched: (count: number) => string;
         itemsHidden: (count: number) => string;
+    };
+    // 确认对话框
+    confirm?: {
+        titleHide: string;
+        titleShow: string;
+        summaryHide: (count: number) => string;
+        summaryShow: (count: number) => string;
+        protectedWarning: (count: number) => string;
+        proceed: string;
+        cancel: string;
+    };
+    debugToggle?: {
+        name: string;
+        desc: string;
+    };
+    // 支持开发者
+    support?: {
+        name: string;
+        desc: string;
+        button: string;
     };
 }
 
@@ -104,7 +122,7 @@ export const en: Translation = {
         error: 'Failed to show files: ',
     },
     ignoreRules: {
-        title: 'Ignore rules',
+        title: 'Ignore Rules',
         formatTitle: 'Rule format (one per line):',
         formats: [
             'File pattern: test.md',
@@ -113,16 +131,15 @@ export const en: Translation = {
             'Wildcard: *test/'
         ],
         noMatches: 'No matching files',
-        matchedFiles: 'Matched files',
+        matchedFiles: 'Matched Files',
         resetButton: 'Reset',
+        resetTooltip: 'Restore default rules',
         rulesTitle: 'Rules',
-        manualApplyButton: "Apply Rules & Scan",
-        manualApplyDesc: "Click to scan and display files matching the current rules.",
-        previousAppliedRuleTooltip: "Previous applied rule",
-        nextAppliedRuleTooltip: "Next applied rule",
-        recentRulesTitle: "Recently Used Rules",
-        loadButton: "Load",
-        noRecentRules: "No recent rules yet.",
+        rulesPlaceholder: 'Enter rules, one per line',
+        searchButton: 'Search',
+        searchTooltip: 'Scan and display files matching the current rules',
+        previousAppliedRuleTooltip: 'Previous applied rule',
+        nextAppliedRuleTooltip: 'Next applied rule',
     },
     commands: {
         applyRules: 'Apply ignore rules',
@@ -155,6 +172,7 @@ export const en: Translation = {
         rollbackSuccess: 'Rollback successful.',
         rollbackError: (message) => `Rollback failed: ${message}`,
         noActionNeeded: 'No files needed to be changed based on the current rules.',
+        protectedSkipped: (count) => `${count} protected item(s) skipped`,
         rulesAppliedAndScanned: "Rules applied and files scanned!",
         ruleLoadedFromHistory: "Rule loaded from history.",
     },
@@ -164,6 +182,24 @@ export const en: Translation = {
     matchedListSummary: {
         itemsMatched: (count) => `${count} ${count === 1 ? 'item' : 'items'} matched`,
         itemsHidden: (count) => `${count} ${count === 1 ? 'item' : 'items'} hidden`,
+    },
+    confirm: {
+        titleHide: 'Confirm Hide',
+        titleShow: 'Confirm Show',
+        summaryHide: (count) => `Add a dot prefix to ${count} item(s).`,
+        summaryShow: (count) => `Remove the dot prefix from ${count} item(s).`,
+        protectedWarning: (count) => `${count} protected item(s) will be skipped`,
+        proceed: 'Proceed',
+        cancel: 'Cancel',
+    },
+    debugToggle: {
+        name: 'Debug Logging',
+        desc: 'Write detailed diagnostics to the developer console.',
+    },
+    support: {
+        name: 'Support the Developer',
+        desc: 'If you find this plugin helpful, consider supporting its development.',
+        button: 'Buy Me a Coffee',
     },
 };
 
@@ -196,16 +232,13 @@ export const zhCN: Translation = {
         noMatches: '无匹配文件',
         matchedFiles: '匹配的文件',
         resetButton: '重置',
+        resetTooltip: '恢复默认规则',
         rulesTitle: '规则',
-        manualApplyButton: "应用规则并扫描",
-        manualApplyDesc: "点击以根据当前规则扫描并显示匹配的文件。",
-        undoButton: "撤销",
-        redoButton: "重做",
-        previousAppliedRuleTooltip: "上一个应用的规则",
-        nextAppliedRuleTooltip: "下一个应用的规则",
-        recentRulesTitle: "最近使用的规则",
-        loadButton: "加载",
-        noRecentRules: "暂无最近规则。",
+        rulesPlaceholder: '输入规则，每行一个',
+        searchButton: '搜索',
+        searchTooltip: '扫描并显示匹配当前规则的文件',
+        previousAppliedRuleTooltip: '上一个应用的规则',
+        nextAppliedRuleTooltip: '下一个应用的规则',
     },
     commands: {
         applyRules: '应用忽略规则',
@@ -238,6 +271,7 @@ export const zhCN: Translation = {
         rollbackSuccess: '回滚成功。',
         rollbackError: (message) => `回滚失败: ${message}`,
         noActionNeeded: '根据当前规则，没有文件需要更改。',
+        protectedSkipped: (count) => `已跳过 ${count} 个受保护路径`,
         rulesAppliedAndScanned: "规则已应用且文件已扫描！",
         ruleLoadedFromHistory: "已从历史记录加载规则。",
     },
@@ -247,6 +281,24 @@ export const zhCN: Translation = {
     matchedListSummary: {
         itemsMatched: (count) => `共 ${count} 个项目匹配`,
         itemsHidden: (count) => `其中 ${count} 个项目已隐藏`,
+    },
+    confirm: {
+        titleHide: '确认隐藏',
+        titleShow: '确认显示',
+        summaryHide: (count) => `将为 ${count} 个项目添加点前缀。`,
+        summaryShow: (count) => `将为 ${count} 个项目移除点前缀。`,
+        protectedWarning: (count) => `其中 ${count} 个受保护路径将被跳过`,
+        proceed: '继续',
+        cancel: '取消',
+    },
+    debugToggle: {
+        name: '调试日志',
+        desc: '将详细的诊断信息写入开发者控制台。',
+    },
+    support: {
+        name: '支持开发者',
+        desc: '如果您觉得这个插件有帮助，请考虑支持其开发。',
+        button: '请我喝咖啡',
     },
 };
 
@@ -279,16 +331,13 @@ export const zhTW: Translation = {
         noMatches: '無符合檔案',
         matchedFiles: '符合的檔案',
         resetButton: '重設',
+        resetTooltip: '恢復預設規則',
         rulesTitle: '規則',
-        manualApplyButton: "套用規則並掃描",
-        manualApplyDesc: "點擊以根據當前規則掃描並顯示符合的檔案。",
-        undoButton: "復原",
-        redoButton: "重做",
-        previousAppliedRuleTooltip: "上一個套用的規則",
-        nextAppliedRuleTooltip: "下一個套用的規則",
-        recentRulesTitle: "最近使用的規則",
-        loadButton: "載入",
-        noRecentRules: "暫無最近規則。",
+        rulesPlaceholder: '輸入規則，每行一個',
+        searchButton: '搜尋',
+        searchTooltip: '掃描並顯示符合當前規則的檔案',
+        previousAppliedRuleTooltip: '上一個套用的規則',
+        nextAppliedRuleTooltip: '下一個套用的規則',
     },
     commands: {
         applyRules: '套用忽略規則',
@@ -321,6 +370,7 @@ export const zhTW: Translation = {
         rollbackSuccess: '還原成功。',
         rollbackError: (message) => `還原失敗: ${message}`,
         noActionNeeded: '根據目前規則，沒有檔案需要變更。',
+        protectedSkipped: (count) => `已跳過 ${count} 個受保護路徑`,
         rulesAppliedAndScanned: "規則已套用且檔案已掃描！",
         ruleLoadedFromHistory: "已從歷史記錄載入規則。",
     },
@@ -331,88 +381,23 @@ export const zhTW: Translation = {
         itemsMatched: (count) => `共 ${count} 個項目符合`,
         itemsHidden: (count) => `其中 ${count} 個項目已隱藏`,
     },
-};
-
-export const ja: Translation = {
-    settingsTitle: 'File Ignore 設定',
-    settingsHeaderInfo: "「表示/非表示」ボタンを使用してルールを適用します。一致したファイルは右側にプレビュー表示されます。",
-    applyRules: {
-        name: 'ファイルを隠す',
-        desc: 'マッチしたファイルにドット接頭辞を追加して隠す',
-        button: '隠す',
-        success: 'ファイルを隠しました',
-        error: 'ファイルを隠せませんでした：',
+    confirm: {
+        titleHide: '確認隱藏',
+        titleShow: '確認顯示',
+        summaryHide: (count) => `將為 ${count} 個項目新增點字首。`,
+        summaryShow: (count) => `將為 ${count} 個項目移除點字首。`,
+        protectedWarning: (count) => `其中 ${count} 個受保護路徑將被略過`,
+        proceed: '繼續',
+        cancel: '取消',
     },
-    revertRules: {
-        name: 'ファイルを表示',
-        desc: 'マッチしたファイルのドット接頭辞を削除して表示',
-        button: '表示',
-        success: 'ファイルを表示しました',
-        error: 'ファイルを表示できませんでした：',
+    debugToggle: {
+        name: '偵錯日誌',
+        desc: '將詳細的診斷訊息寫入開發者控制台。',
     },
-    ignoreRules: {
-        title: '無視ルール',
-        formatTitle: 'ルール形式（1行に1つ）：',
-        formats: [
-            'ファイル：test.md',
-            'ルート：/readme.md',
-            'フォルダ：temp/',
-            'ワイルドカード：*test/'
-        ],
-        noMatches: '一致するファイルがありません',
-        matchedFiles: '一致したファイル',
-        resetButton: 'リセット',
-        rulesTitle: 'ルール',
-        manualApplyButton: "ルールを適用してスキャン",
-        manualApplyDesc: "現在のルールに基づいてファイルをスキャンして表示するには、ここをクリックしてください。",
-        undoButton: "元に戻す",
-        redoButton: "やり直す",
-        previousAppliedRuleTooltip: "前に適用されたルール",
-        nextAppliedRuleTooltip: "次に適用されたルール",
-        recentRulesTitle: "最近使用したルール",
-        loadButton: "読み込む",
-        noRecentRules: "最近使用したルールはありません。",
-    },
-    commands: {
-        applyRules: '無視ルールを適用',
-        addDot: 'ドット接頭辞を追加（隠す）',
-        removeDot: 'ドット接頭辞を削除（表示）',
-    },
-    menu: {
-        hide: '隠す',
-        show: '表示',
-        loading: '読み込み中...',
-    },
-    notice: {
-        hidden: '{itemType} が非表示になりました',
-        shown: '{itemType} が表示されました',
-        hideError: '非表示に失敗しました',
-        showError: '表示に失敗しました',
-        noRules: '有効なルールがありません',
-        noMatches: '一致するファイルが見つかりません',
-        applied: (count) => `${count} 個の項目を正常に非表示にしました`,
-        reverted: (count) => `${count} 個の項目を正常に表示しました`,
-        applyError: (message) => `ルールの適用中にエラーが発生しました: ${message}`,
-        listError: (message) => `ディレクトリの内容の表示に失敗しました: ${message}`,
-        folder: 'フォルダ',
-        file: 'ファイル',
-        settingsErrorInit: 'FileOperations が初期化されていません',
-        statusHidden: (count) => `${count} 件の一致アイテムが非表示になります`,
-        statusNotHidden: '一致するアイテムは非表示になりません',
-        loading: '読み込み中...',
-        unknownError: '不明なエラーが発生しました。',
-        rollbackSuccess: 'ロールバックに成功しました。',
-        rollbackError: (message) => `ロールバックに失敗しました: ${message}`,
-        noActionNeeded: '現在のルールに基づき、変更が必要なファイルはありません。',
-        rulesAppliedAndScanned: "ルールが適用され、ファイルがスキャンされました！",
-        ruleLoadedFromHistory: "履歴からルールを読み込みました。",
-    },
-    buttons: {
-        scanAndApply: "ルールを適用してスキャン",
-    },
-    matchedListSummary: {
-        itemsMatched: (count) => `合計 ${count} 件のアイテムが一致`,
-        itemsHidden: (count) => `うち ${count} 件のアイテムが非表示`,
+    support: {
+        name: '支持開發者',
+        desc: '如果您覺得這個外掛有幫助，請考慮支持其開發。',
+        button: '請我喝咖啡',
     },
 };
 
@@ -420,7 +405,6 @@ export const locales: Record<string, Translation> = {
     'en': en,
     'zh-CN': zhCN,
     'zh-TW': zhTW,
-    'ja': ja,
 };
 
 export type LocaleKey = keyof typeof locales; 

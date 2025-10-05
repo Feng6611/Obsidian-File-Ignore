@@ -1,7 +1,7 @@
 # 📁 File Ignore
 
 一个 Obsidian 插件，通过管理文件/文件夹的点 (.) 前缀（隐藏属性）来控制 Obsidian 的索引行为，提供类似 `.gitignore` 的文件过滤体验。
-obsidian-file-igonre.kkuk.dev
+obsidian-file-ignore.kkuk.dev
 
 [English](README.md) | 简体中文
 
@@ -55,7 +55,7 @@ obsidian-file-igonre.kkuk.dev
 
 ## 🤝 支持与反馈 (Support & Feedback)
 
-如果您在使用过程中遇到任何问题或有改进建议，欢迎访问我们的 [GitHub 仓库](https://github.com/feng6611/file-ignore) 提交 Issue
+如果您在使用过程中遇到任何问题或有改进建议，欢迎访问我们的 [GitHub 仓库](https://github.com/Feng6611/Obsidian-File-Ignore) 提交 Issue
 
 您也可以通过给我买杯咖啡来支持我：[请我喝咖啡](https://buymeacoffee.com/RDzWpfRwLU)
 

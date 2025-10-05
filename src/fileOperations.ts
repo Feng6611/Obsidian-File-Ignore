@@ -3,10 +3,10 @@ import minimatch from 'minimatch';
 import { LocalFileSystem, FileInfo } from './localFileSystem';
 import path from 'path';
 import fs from 'fs';
-import { debounce } from 'obsidian';
 
 interface FileSystemAdapterExtended {
     getBasePath(): string;
+    rename?(oldPath: string, newPath: string): Promise<void>;
 }
 
 export interface FileOperation {
@@ -26,20 +26,20 @@ export class FileOperations {
     private operations: FileOperation[] = [];
     private DEBUG = false;  // 默认关闭调试模式
     private rules: Rule[] = [];
-    private debouncedGetFilesToProcess: (rules: string[], resolve: (result: FileInfo[]) => void, reject: (error: any) => void) => void;
+    private fileCache: { items: FileInfo[]; timestamp: number } | null = null;
+    private static CACHE_TTL = 2000;
+    // 受保护目录（不允许被隐藏/显示操作）——基于库根的相对路径首段
+    private static PROTECTED_PREFIXES = [
+        '.obsidian',
+        '.git',
+        '.trash',
+    ];
 
     constructor(vault: Vault) {
         this.vault = vault;
         // 通过泛型转换获得 adapter 的类型并获取 basePath
         const adapter = (this.vault.adapter as unknown) as FileSystemAdapterExtended;
         this.localFs = new LocalFileSystem(adapter.getBasePath());
-        // 初始化防抖函数，设置 1.5s 延迟
-        this.debouncedGetFilesToProcess = debounce(
-            (rules: string[], resolve: (result: FileInfo[]) => void, reject: (error: any) => void) => {
-                this._getFilesToProcess(rules).then(resolve).catch(reject);
-            },
-            1500
-        );
     }
 
     setDebug(enabled: boolean) {
@@ -48,7 +48,22 @@ export class FileOperations {
 
     private debug(...args: any[]) {
         if (this.DEBUG) {
-            console.log('[file-ignore]', ...args);
+            console.debug('[file-ignore]', ...args);
+        }
+    }
+
+    private audit(level: 'info' | 'warn' | 'error', message: string, context?: Record<string, any>) {
+        const payload = context ? ['[file-ignore][audit]', message, context] : ['[file-ignore][audit]', message];
+        switch (level) {
+            case 'warn':
+                console.warn(...payload);
+                break;
+            case 'error':
+                console.error(...payload);
+                break;
+            default:
+                console.info(...payload);
+                break;
         }
     }
 
@@ -70,7 +85,26 @@ export class FileOperations {
      * 递归获取所有文件，包括隐藏文件
      */
     private getAllFilesRecursively(currentPath: string = ''): FileInfo[] {
-        return this.localFs.getAllFiles(currentPath);
+        if (currentPath === '' && this.fileCache && (Date.now() - this.fileCache.timestamp) < FileOperations.CACHE_TTL) {
+            return this.fileCache.items;
+        }
+
+        const items = this.localFs.getAllFiles(currentPath);
+
+        if (currentPath === '') {
+            this.fileCache = { items, timestamp: Date.now() };
+        }
+
+        return items;
+    }
+
+    /**
+     * 判断是否为受保护路径（例如 .obsidian/、.git/ 等）
+     */
+    public isProtectedPath(relPath: string): boolean {
+        const normalized = relPath.replace(/\\/g, '/');
+        const top = normalized.split('/')[0];
+        return FileOperations.PROTECTED_PREFIXES.includes(top);
     }
 
     /**
@@ -103,7 +137,7 @@ export class FileOperations {
             // 对于绝对路径，直接进行完整路径匹配
             const matchOptions = {
                 dot: true,           // 匹配点文件
-                nocase: true,        // 忽略大小写
+                nocase: false,       // 区分大小写
                 matchBase: false,    // 使用完整路径匹配
                 noglobstar: false    // 启用 ** 匹配
             };
@@ -120,7 +154,7 @@ export class FileOperations {
         // 使用 minimatch 进行 glob 匹配
         const matchOptions = {
             dot: true,           // 匹配点文件
-            nocase: true,        // 忽略大小写
+            nocase: false,       // 区分大小写
             matchBase: false,    // 使用完整路径匹配
             noglobstar: false    // 启用 ** 匹配
         };
@@ -131,12 +165,10 @@ export class FileOperations {
     }
 
     /**
-     * 获取需要处理的文件列表（带防抖的公共方法）
+     * 获取需要处理的文件列表
      */
     async getFilesToProcess(rules: string[]): Promise<FileInfo[]> {
-        return new Promise((resolve, reject) => {
-            this.debouncedGetFilesToProcess(rules, resolve, reject);
-        });
+        return this._getFilesToProcess(rules);
     }
 
     /**
@@ -183,7 +215,7 @@ export class FileOperations {
                 // minimatch options
                 const minimatchOptions = {
                     dot: true,       // Match dotfiles (e.g. .git) - allows * to match .file
-                    nocase: true,    // Case-insensitive matching
+                    nocase: false,   // Case-sensitive matching
                     matchBase: false // Pattern should match against the full path
                 };
 
@@ -281,6 +313,9 @@ export class FileOperations {
      * @returns Promise resolving to an object { success: boolean, error?: string }
      */
     public async addDotPrefix(fileInfo: FileInfo, isAdd: boolean = true): Promise<{ success: boolean; error?: string }> {
+        if (this.isProtectedPath(fileInfo.path)) {
+            return { success: false, error: `Protected path: ${fileInfo.path}` };
+        }
         const currentPath = fileInfo.path;
         const isDirectory = fileInfo.isDirectory;
         let newPath: string;
@@ -313,6 +348,19 @@ export class FileOperations {
             return { success: true };
         }
 
+        // ⚠️ 安全检查：确保目标路径不存在，避免数据覆盖
+        const targetFullPath = this.localFs.getFullPath(vaultNewPath);
+        if (fs.existsSync(targetFullPath)) {
+            const errorMsg = `Target path already exists: "${vaultNewPath}"`;
+            this.debug(`${errorMsg}. Operation aborted to prevent data loss.`);
+            this.audit('warn', 'rename-skipped-target-exists', {
+                operation: isAdd ? 'hide' : 'show',
+                source: vaultCurrentPath,
+                target: vaultNewPath
+            });
+            return { success: false, error: errorMsg };
+        }
+
         try {
             this.debug(`Attempting to rename "${vaultCurrentPath}" to "${vaultNewPath}"`);
             const file = this.vault.getAbstractFileByPath(vaultCurrentPath);
@@ -320,15 +368,48 @@ export class FileOperations {
                 await this.vault.rename(file, vaultNewPath);
                 this.debug(`Successfully renamed "${vaultCurrentPath}" to "${vaultNewPath}"`);
                 this.operations.push({ oldPath: vaultCurrentPath, newPath: vaultNewPath, timestamp: Date.now() });
+                this.invalidateFileCache();
+                this.audit('info', 'rename-completed', {
+                    method: 'vault',
+                    operation: isAdd ? 'hide' : 'show',
+                    source: vaultCurrentPath,
+                    target: vaultNewPath
+                });
                 return { success: true };
-            } else {
-                const errorMsg = `File not found in Vault: "${vaultCurrentPath}"`;
-                this.debug(errorMsg);
-                return { success: false, error: errorMsg };
             }
+
+            const adapter = (this.vault.adapter as unknown) as FileSystemAdapterExtended;
+            if (adapter?.rename) {
+                await adapter.rename(vaultCurrentPath, vaultNewPath);
+                this.debug(`Adapter rename successful for "${vaultCurrentPath}" -> "${vaultNewPath}"`);
+                this.operations.push({ oldPath: vaultCurrentPath, newPath: vaultNewPath, timestamp: Date.now() });
+                this.invalidateFileCache();
+                this.audit('info', 'rename-completed', {
+                    method: 'adapter',
+                    operation: isAdd ? 'hide' : 'show',
+                    source: vaultCurrentPath,
+                    target: vaultNewPath
+                });
+                return { success: true };
+            }
+
+            const errorMsg = `File not found in Vault: "${vaultCurrentPath}"`;
+            this.debug(errorMsg);
+            this.audit('warn', 'rename-missing-source', {
+                operation: isAdd ? 'hide' : 'show',
+                source: vaultCurrentPath,
+                target: vaultNewPath
+            });
+            return { success: false, error: errorMsg };
         } catch (error: any) {
             const errorMsg = `Error renaming "${vaultCurrentPath}" to "${vaultNewPath}": ${error.message}`;
             this.debug(errorMsg, error);
+            this.audit('error', 'rename-failed', {
+                operation: isAdd ? 'hide' : 'show',
+                source: vaultCurrentPath,
+                target: vaultNewPath,
+                message: error?.message ?? String(error)
+            });
             return { success: false, error: errorMsg };
         }
     }
@@ -399,6 +480,11 @@ export class FileOperations {
         this.operations.splice(this.operations.length - numRolledBackActually, numRolledBackActually);
 
         this.debug('Rollback finished. Remaining operations:', this.operations);
+        this.invalidateFileCache();
+    }
+
+    private invalidateFileCache() {
+        this.fileCache = null;
     }
 
     /**
