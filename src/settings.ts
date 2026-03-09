@@ -1,20 +1,9 @@
-import { App, PluginSettingTab, Setting, TextAreaComponent, ButtonComponent, Notice, Modal } from 'obsidian';
+import { App, ButtonComponent, Modal, Notice, PluginSettingTab, Setting, TextAreaComponent, debounce } from 'obsidian';
 import type FileIgnorePlugin from './main';
-import { locales, type Translation } from './i18n/locales';
-import { debounce } from "obsidian";
-import moment from 'moment';
+import type { RenamePlan } from './fileOperations';
+import type { Translation } from './i18n/locales';
 import type { FileInfo } from './localFileSystem';
-
-export interface FileIgnoreSettings {
-    rules: string;  // 保持为字符串类型，存储原始文本
-    debug: boolean;
-    rulesHistory?: string[]; // 新增：存储最近5条规则历史
-}
-
-export const DEFAULT_SETTINGS: FileIgnoreSettings = {
-    rules: 'node_modules/\nsrc/',
-    debug: false  // 默认关闭调试模式
-}
+import { DEFAULT_SETTINGS } from './types';
 
 export class FileIgnoreSettingTab extends PluginSettingTab {
     plugin: FileIgnorePlugin;
@@ -22,7 +11,6 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
     t: Translation;
     private debouncedUpdateMatchedFiles: () => void;
 
-    // For navigating applied rules history
     private appliedRulesHistoryIndex = -1;
     private prevAppliedRuleButton: ButtonComponent;
     private nextAppliedRuleButton: ButtonComponent;
@@ -40,15 +28,10 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         );
     }
 
-    // saveSettings 现在只负责调用 plugin.saveSettings
-    // plugin.saveSettings 会处理 rulesHistory 的更新
     saveSettings = debounce(async (value: string) => {
         await this.plugin.saveSettings(value);
-        // 当规则通过文本编辑并保存后，它成为最新的"已应用"规则
-        // 因此，appliedRulesHistoryIndex 应指向它 (即历史记录的第0项)
         const currentRulesInHistory = this.plugin.settings.rulesHistory || [];
         this.appliedRulesHistoryIndex = currentRulesInHistory.indexOf(value);
-        // 如果刚保存的规则是全新的（之前不在历史中），它会被 unshift 到第0位
         if (this.appliedRulesHistoryIndex === -1 && currentRulesInHistory.length > 0 && currentRulesInHistory[0] === value) {
             this.appliedRulesHistoryIndex = 0;
         }
@@ -81,7 +64,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
                 .filter((line: string) => line && !line.startsWith('#'));
 
             matchedFiles = await this.plugin.fileOps.getFilesToProcess(currentRules);
-            hiddenCount = matchedFiles.filter(file => file.path.startsWith('.')).length;
+            hiddenCount = matchedFiles.filter(file => this.plugin.fileOps!.isHiddenPath(file.path)).length;
         } catch (e) {
             console.error('[file-ignore] Error updating display:', e);
             error = e instanceof Error ? e : new Error(String(e));
@@ -91,21 +74,16 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         this.renderMatchedFilesList(listContainer, matchedFiles, hiddenCount, error);
     }
 
-    private async updateMatchedFiles() {
-        this.debouncedUpdateMatchedFiles();
-        return Promise.resolve();
-    }
-
     private async updateMatchedFilesImmediate() {
         await this.updateDisplayAsync();
     }
 
     private loadRuleAndRefresh(ruleText: string, newIndex: number) {
         this.rulesTextArea.setValue(ruleText);
-        this.plugin.settings.rules = ruleText; // 同步内存中的当前规则，以供即时匹配显示
+        this.plugin.settings.rules = ruleText;
         this.appliedRulesHistoryIndex = newIndex;
         this.updateNavigationButtonStates();
-        this.debouncedUpdateDisplay(); // 触发右侧列表更新
+        this.debouncedUpdateDisplay();
         new Notice(this.t.notice.ruleLoadedFromHistory || 'Rule loaded from history.');
     }
 
@@ -114,12 +92,12 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         if (history.length === 0) return;
 
         let newIndex;
-        if (this.appliedRulesHistoryIndex === -1) { // 当前文本框内容不在历史中 (或首次导航)
-            newIndex = history.length - 1; // "上一个"加载历史中的最后一条(最旧的)
+        if (this.appliedRulesHistoryIndex === -1) {
+            newIndex = history.length - 1;
         } else if (this.appliedRulesHistoryIndex > 0) {
             newIndex = this.appliedRulesHistoryIndex - 1;
         } else {
-            return; // 已经是第一条或无法确定更早的
+            return;
         }
         if (newIndex >= 0 && newIndex < history.length) {
             this.loadRuleAndRefresh(history[newIndex], newIndex);
@@ -131,12 +109,12 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         if (history.length === 0) return;
 
         let newIndex;
-        if (this.appliedRulesHistoryIndex === -1) { // 当前文本框内容不在历史中 (或首次导航)
-            newIndex = 0; // "下一个"加载历史中的第一条(最新的)
+        if (this.appliedRulesHistoryIndex === -1) {
+            newIndex = 0;
         } else if (this.appliedRulesHistoryIndex < history.length - 1) {
             newIndex = this.appliedRulesHistoryIndex + 1;
         } else {
-            return; // 已经是最后一条或无法确定更新的
+            return;
         }
         if (newIndex >= 0 && newIndex < history.length) {
             this.loadRuleAndRefresh(history[newIndex], newIndex);
@@ -151,7 +129,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
             if (historyLength === 0) {
                 this.prevAppliedRuleButton.setDisabled(true);
             } else if (this.appliedRulesHistoryIndex === -1) {
-                this.prevAppliedRuleButton.setDisabled(false); // 如果不在历史中，允许跳到历史末尾
+                this.prevAppliedRuleButton.setDisabled(false);
             } else {
                 this.prevAppliedRuleButton.setDisabled(this.appliedRulesHistoryIndex === 0);
             }
@@ -160,11 +138,68 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
             if (historyLength === 0) {
                 this.nextAppliedRuleButton.setDisabled(true);
             } else if (this.appliedRulesHistoryIndex === -1) {
-                this.nextAppliedRuleButton.setDisabled(false); // 如果不在历史中，允许跳到历史开头
+                this.nextAppliedRuleButton.setDisabled(false);
             } else {
                 this.nextAppliedRuleButton.setDisabled(this.appliedRulesHistoryIndex === historyLength - 1);
             }
         }
+    }
+
+    private async preparePlan(hide: boolean): Promise<{ matched: FileInfo[]; plan: RenamePlan } | null> {
+        await this.plugin.saveSettings(this.rulesTextArea.getValue());
+        const currentRules = this.plugin.settings.rules.split('\n')
+            .map((line: string) => line.trim())
+            .filter((line: string) => line && !line.startsWith('#'));
+
+        if (currentRules.length === 0) {
+            new Notice(this.t.notice.noRules);
+            return null;
+        }
+
+        if (!this.plugin.fileOps) {
+            new Notice(this.t.notice.settingsErrorInit);
+            return null;
+        }
+
+        const matched = await this.plugin.fileOps.getFilesToProcess(currentRules);
+        if (matched.length === 0) {
+            new Notice(this.t.notice.noMatches);
+            return null;
+        }
+
+        const plan = this.plugin.fileOps.buildRenamePlan(matched, hide);
+        return { matched, plan };
+    }
+
+    private renderRecoverySection(containerEl: HTMLElement) {
+        const batch = this.plugin.getRecoverableBatch();
+        if (!batch) {
+            return;
+        }
+
+        const mode = this.plugin.getRecoveryMode(batch);
+        const renameCount = batch.completed.length;
+        const pendingCount = batch.pending.length;
+
+        const desc = mode === 'recover'
+            ? (this.t.recovery?.interruptedDesc?.(renameCount, pendingCount)
+                ?? `${renameCount} item(s) were already renamed before the last batch stopped. ${pendingCount} item(s) remain pending.`)
+            : (this.t.recovery?.completedDesc?.(renameCount)
+                ?? `Undo the last completed batch (${renameCount} renamed item(s)).`);
+
+        new Setting(containerEl)
+            .setName(this.t.recovery?.title ?? 'Recovery')
+            .setDesc(desc)
+            .addButton(button => button
+                .setButtonText(mode === 'recover'
+                    ? (this.t.recovery?.buttonRecover ?? 'Undo interrupted batch')
+                    : (this.t.recovery?.buttonUndo ?? 'Undo last batch'))
+                .setCta()
+                .onClick(async () => {
+                    await this.plugin.rollback();
+                    await this.display();
+                    await this.updateDisplayAsync();
+                }));
     }
 
     async display(): Promise<void> {
@@ -173,16 +208,11 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
 
         containerEl.createEl('h2', { text: this.t.settingsTitle, cls: 'file-ignore-settings-title' });
 
-        // Ensure the initially loaded plugin rules are processed for history and auto-matching.
         const initialPluginRules = this.plugin.settings.rules;
         await this.plugin.saveSettings(initialPluginRules, true);
-        // After this call:
-        // 1. this.plugin.settings.rules is set (or remains initialPluginRules).
-        // 2. If initialPluginRules was non-empty, it's now at the front of this.plugin.settings.rulesHistory.
 
         const topActionRow = containerEl.createDiv('file-ignore-top-action-row');
         const statusContainer = topActionRow.createDiv('file-ignore-status-inline-container');
-        // 初始渲染固定提示文本，确保页面加载时就显示
         this.renderStatusInfo(statusContainer, null, null);
 
         const buttonGroup = topActionRow.createDiv('file-ignore-button-group');
@@ -191,61 +221,45 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
             .setCta()
             .setTooltip(this.t.applyRules.desc)
             .onClick(async () => {
-                // 确保使用当前文本框中的规则立即执行
-                await this.plugin.saveSettings(this.rulesTextArea.getValue());
-                const currentRules = this.plugin.settings.rules.split('\n')
-                    .map((line: string) => line.trim())
-                    .filter((line: string) => line && !line.startsWith('#'));
-                if (!this.plugin.fileOps) return;
-                const matched = await this.plugin.fileOps.getFilesToProcess(currentRules);
-                const actionable = matched.filter(f => !this.plugin.fileOps!.isProtectedPath(f.path));
-                const skipped = matched.length - actionable.length;
-                if (actionable.length === 0) {
+                const prepared = await this.preparePlan(true);
+                if (!prepared) return;
+                const { matched, plan } = prepared;
+                if (plan.items.length === 0) {
                     new Notice(this.t.notice.noActionNeeded);
                     return;
                 }
-                const ok = await this.confirmAction(true, actionable, skipped);
+                const ok = await this.confirmAction(true, plan);
                 if (!ok) {
-                    this.updateDisplayAsync();
+                    await this.updateDisplayAsync();
                     return;
                 }
-                await this.plugin.applyRules(true, {
-                    matches: matched,
-                    actionable: actionable,
-                    skippedProtected: skipped
-                });
-                this.updateDisplayAsync();
+                await this.plugin.applyRules(true, { matches: matched, plan });
+                await this.display();
+                await this.updateDisplayAsync();
             });
 
         new ButtonComponent(buttonGroup)
             .setButtonText(this.t.revertRules.button)
             .setTooltip(this.t.revertRules.desc)
             .onClick(async () => {
-                // 确保使用当前文本框中的规则立即执行
-                await this.plugin.saveSettings(this.rulesTextArea.getValue());
-                const currentRules = this.plugin.settings.rules.split('\n')
-                    .map((line: string) => line.trim())
-                    .filter((line: string) => line && !line.startsWith('#'));
-                if (!this.plugin.fileOps) return;
-                const matched = await this.plugin.fileOps.getFilesToProcess(currentRules);
-                const actionable = matched.filter(f => !this.plugin.fileOps!.isProtectedPath(f.path));
-                const skipped = matched.length - actionable.length;
-                if (actionable.length === 0) {
+                const prepared = await this.preparePlan(false);
+                if (!prepared) return;
+                const { matched, plan } = prepared;
+                if (plan.items.length === 0) {
                     new Notice(this.t.notice.noActionNeeded);
                     return;
                 }
-                const ok = await this.confirmAction(false, actionable, skipped);
+                const ok = await this.confirmAction(false, plan);
                 if (!ok) {
-                    this.updateDisplayAsync();
+                    await this.updateDisplayAsync();
                     return;
                 }
-                await this.plugin.applyRules(false, {
-                    matches: matched,
-                    actionable: actionable,
-                    skippedProtected: skipped
-                });
-                this.updateDisplayAsync();
+                await this.plugin.applyRules(false, { matches: matched, plan });
+                await this.display();
+                await this.updateDisplayAsync();
             });
+
+        this.renderRecoverySection(containerEl);
 
         new Setting(containerEl).setName(this.t.ignoreRules.title).setHeading();
 
@@ -263,7 +277,6 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         const leftTitleContainer = leftPanel.createDiv('file-ignore-panel-title-container');
         leftTitleContainer.createEl('p', { text: this.t.ignoreRules.rulesTitle, cls: 'setting-item-name file-ignore-panel-title' });
 
-        // 添加主操作按钮到标题栏
         const titleActionContainer = leftTitleContainer.createDiv('file-ignore-title-actions');
         new ButtonComponent(titleActionContainer)
             .setButtonText(this.t.ignoreRules.searchButton)
@@ -272,15 +285,15 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
             .onClick(async () => {
                 await this.plugin.saveSettings(this.rulesTextArea.getValue());
                 this.appliedRulesHistoryIndex = (this.plugin.settings.rulesHistory || []).indexOf(this.rulesTextArea.getValue());
-                if (this.appliedRulesHistoryIndex === -1 && (this.plugin.settings.rulesHistory || []).length > 0) this.appliedRulesHistoryIndex = 0;
+                if (this.appliedRulesHistoryIndex === -1 && (this.plugin.settings.rulesHistory || []).length > 0) {
+                    this.appliedRulesHistoryIndex = 0;
+                }
                 this.updateNavigationButtonStates();
                 await this.updateMatchedFilesImmediate();
                 new Notice(this.t.notice?.rulesAppliedAndScanned || 'Rules scanned and preview updated!');
             });
 
         const textAreaContainer = leftPanel.createDiv('file-ignore-rules-textarea-container');
-
-        // 导航按钮容器
         const navContainer = textAreaContainer.createDiv('file-ignore-nav-container');
 
         this.prevAppliedRuleButton = new ButtonComponent(navContainer)
@@ -312,19 +325,14 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         this.rulesTextArea.inputEl.addClass('file-ignore-rules-textarea');
         this.rulesTextArea.inputEl.setAttribute('rows', '20');
         this.rulesTextArea.inputEl.setAttribute('placeholder', this.t.ignoreRules.rulesPlaceholder);
-        // Populate with the current rules, which might have been updated by saveSettings
         this.rulesTextArea.setValue(this.plugin.settings.rules || DEFAULT_SETTINGS.rules);
 
-        // After the saveSettings call, plugin.settings.rules should be at index 0 of rulesHistory if non-empty.
         this.appliedRulesHistoryIndex = (this.plugin.settings.rulesHistory || []).indexOf(this.plugin.settings.rules);
-
         this.updateNavigationButtonStates();
 
         this.rulesTextArea.onChange(async (value) => {
-            this.plugin.settings.rules = value; // Update in-memory rules for debouncedUpdateDisplay IF it were here
-            // But primarily, this is for saveSettings to pick up.
+            this.plugin.settings.rules = value;
             this.saveSettings(value);
-            // NO display update here, only on button clicks
         });
 
         const rightPanel = mainContainer.createDiv('file-ignore-matched-panel');
@@ -334,10 +342,8 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         const filesListContainer = matchedFilesContainer.createDiv('file-ignore-matched-files-list-container');
         this.showLoading(filesListContainer);
 
-        // 页面加载或重置时，执行一次更新以渲染匹配列表和持续显示提示
         this.updateDisplayAsync();
 
-        // --- Add Buy Me A Coffee Link ---
         if (this.t.support) {
             const support = this.t.support;
             const supportSetting = new Setting(containerEl)
@@ -350,7 +356,6 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
                     }));
             supportSetting.controlEl.addClass('file-ignore-support-button-container');
         }
-        // --- End Buy Me A Coffee Link ---
 
         new Setting(containerEl)
             .setName(this.t.debugToggle?.name ?? 'Debug logging')
@@ -391,7 +396,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         const summaryContainer = listEl.createDiv('file-ignore-matched-files-summary');
         if (this.t.matchedListSummary) {
             summaryContainer.createEl('p', { text: this.t.matchedListSummary.itemsMatched(matchedFiles.length), cls: 'file-ignore-summary-item' });
-            summaryContainer.createEl('p', { text: this.t.matchedListSummary.itemsHidden(hiddenCount as number), cls: 'file-ignore-summary-item' });
+            summaryContainer.createEl('p', { text: this.t.matchedListSummary.itemsHidden(hiddenCount), cls: 'file-ignore-summary-item' });
         }
 
         const sortedFiles = [...matchedFiles].sort((a, b) => {
@@ -399,22 +404,13 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
             return a.path.localeCompare(b.path);
         });
 
-        const MAX_FILES_TO_DISPLAY = 30; // 定义最大显示文件数
+        const MAX_FILES_TO_DISPLAY = 30;
         let filesToRender = sortedFiles;
 
         if (sortedFiles.length > MAX_FILES_TO_DISPLAY) {
             filesToRender = sortedFiles.slice(0, MAX_FILES_TO_DISPLAY);
-
-            let truncationMessageText: string;
-            // 尝试使用 i18n 获取翻译文本
-            // @ts-ignore - 假设 t.matchedListSummary.displayingNofM 可能存在
-            if (this.t.matchedListSummary && typeof this.t.matchedListSummary.displayingNofM === 'function') {
-                // @ts-ignore
-                truncationMessageText = this.t.matchedListSummary.displayingNofM(filesToRender.length, sortedFiles.length);
-            } else {
-                // Fallback 中文提示
-                truncationMessageText = `列表过长，仅显示最前的 ${filesToRender.length} 项 (共 ${sortedFiles.length} 项)。隐藏/取消隐藏操作将对所有匹配项生效。`;
-            }
+            const truncationMessageText = this.t.matchedListSummary?.displayingNofM?.(filesToRender.length, sortedFiles.length)
+                ?? `List is long, only showing the first ${filesToRender.length} items (of ${sortedFiles.length}). Hide/Show will still affect all matched items.`;
             summaryContainer.createEl('p', {
                 text: truncationMessageText,
                 cls: 'file-ignore-summary-item file-ignore-truncation-message'
@@ -425,7 +421,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         filesToRender.forEach(file => {
             const isFolder = file.isDirectory;
             const fileItem = filesContainer.createDiv(`file-ignore-file-item ${isFolder ? 'file-ignore-folder-item' : 'file-ignore-regular-item'}`);
-            const displayPath = isFolder ? file.path + '/' : file.path;
+            const displayPath = isFolder ? `${file.path}/` : file.path;
             const pathEl = fileItem.createSpan('file-ignore-item-path');
             pathEl.setText(displayPath);
             fileItem.addEventListener('click', () => {
@@ -438,11 +434,19 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         });
     }
 
-    private async confirmAction(hide: boolean, actionable: FileInfo[], skippedCount: number): Promise<boolean> {
+    private async confirmAction(hide: boolean, plan: RenamePlan): Promise<boolean> {
         const title = hide ? (this.t.confirm?.titleHide || 'Confirm Hide') : (this.t.confirm?.titleShow || 'Confirm Show');
         const summaryFn = hide ? this.t.confirm?.summaryHide : this.t.confirm?.summaryShow;
-        const summary = (summaryFn || ((c: number) => hide ? `Add a dot prefix to ${c} item(s).` : `Remove the dot prefix from ${c} item(s).`))(actionable.length);
-        const protectedWarning = skippedCount > 0 ? (this.t.confirm?.protectedWarning || ((c: number) => `${c} protected item(s) will be skipped`))(skippedCount) : '';
+        const summary = (summaryFn || ((count: number) => hide ? `Add a dot prefix to ${count} item(s).` : `Remove the dot prefix from ${count} item(s).`))(plan.items.length);
+        const protectedWarning = plan.skippedProtected > 0
+            ? (this.t.confirm?.protectedWarning || ((count: number) => `${count} protected item(s) will be skipped`))(plan.skippedProtected)
+            : '';
+        const nestedWarning = plan.skippedNested > 0
+            ? (this.t.confirm?.nestedWarning?.(plan.skippedNested) ?? `${plan.skippedNested} nested item(s) will be skipped because their parent directory is already in the plan.`)
+            : '';
+        const conflictWarning = plan.skippedConflicts > 0
+            ? (this.t.confirm?.conflictWarning?.(plan.skippedConflicts) ?? `${plan.skippedConflicts} item(s) will be skipped because the target path already exists or conflicts with another rename.`)
+            : '';
 
         return await new Promise<boolean>((resolve) => {
             const modal = new class extends Modal {
@@ -453,14 +457,35 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
                     contentEl.createEl('h3', { text: title });
                     contentEl.createEl('p', { text: summary });
                     if (protectedWarning) contentEl.createEl('p', { text: protectedWarning, cls: 'mod-warning' });
+                    if (nestedWarning) contentEl.createEl('p', { text: nestedWarning, cls: 'mod-warning' });
+                    if (conflictWarning) contentEl.createEl('p', { text: conflictWarning, cls: 'mod-warning' });
+
+                    if (plan.items.length > 0) {
+                        contentEl.createEl('h4', { text: (this as any).t?.confirm?.previewTitle || 'Planned renames' });
+                        const previewList = contentEl.createEl('ul');
+                        const previewItems = plan.items.slice(0, 5);
+                        previewItems.forEach(item => {
+                            previewList.createEl('li', { text: `${item.oldPath} → ${item.newPath}` });
+                        });
+                        if (plan.items.length > previewItems.length) {
+                            contentEl.createEl('p', {
+                                text: (this as any).t?.confirm?.previewMore?.(plan.items.length - previewItems.length)
+                                    || `…and ${plan.items.length - previewItems.length} more.`
+                            });
+                        }
+                    }
+
                     const btns = contentEl.createDiv({ cls: 'modal-button-container' });
-                    new ButtonComponent(btns).setButtonText((this as any).t?.confirm?.proceed || 'Proceed')
-                        .setCta().onClick(() => { this.close(); resolve(true); });
-                    new ButtonComponent(btns).setButtonText((this as any).t?.confirm?.cancel || 'Cancel')
+                    new ButtonComponent(btns)
+                        .setButtonText((this as any).t?.confirm?.proceed || 'Proceed')
+                        .setCta()
+                        .onClick(() => { this.close(); resolve(true); });
+                    new ButtonComponent(btns)
+                        .setButtonText((this as any).t?.confirm?.cancel || 'Cancel')
                         .onClick(() => { this.close(); resolve(false); });
                 }
             }(this.app);
-            (modal as any).t = this.t; // pass translation
+            (modal as any).t = this.t;
             modal.open();
         });
     }
@@ -476,7 +501,6 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
             textContainer.setText(`Error: ${error.message}`);
             statusEl.addClass('mod-error');
         } else {
-            // Display fixed informational text, icon remains the info icon.
             iconContainer.innerHTML = '<svg viewBox="0 0 24 24" fill="none" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
             textContainer.setText(this.t.settingsHeaderInfo || 'Click Hide/Show buttons to apply rules.');
         }

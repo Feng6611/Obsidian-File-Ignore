@@ -1,28 +1,20 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, TFolder } from 'obsidian';
-import { FileOperations } from './fileOperations';
+import { App, Notice, Plugin, TFile, TFolder } from 'obsidian';
+import { FileOperations, type RenamePlan } from './fileOperations';
 import { FileIgnoreSettingTab } from './settings';
 import { LocalFileSystem, FileInfo } from './localFileSystem';
 import { locales, type Translation } from './i18n/locales';
 import moment from 'moment';
+import {
+    DEFAULT_SETTINGS,
+    type BatchAction,
+    type FileIgnoreSettings,
+    type FileOperation,
+    type PersistedBatchRecord,
+} from './types';
 
-// 在文件顶部或合适位置增加接口定义
 interface FileSystemAdapterExtended {
     getBasePath(): string;
 }
-
-export interface FileIgnoreSettings {
-    rules: string;
-    ignoredFiles: string[];
-    debug?: boolean;
-    rulesHistory?: string[]; // 新增：存储最近应用的规则 (最多5条)
-}
-
-export const DEFAULT_SETTINGS: FileIgnoreSettings = {
-    rules: 'temp/\n*.tmp\n.DS_Store\n' + (process.platform === 'win32' ? 'Thumbs.db' : ''),
-    ignoredFiles: [],
-    debug: false,
-    rulesHistory: [], // 初始化为空数组
-};
 
 export default class FileIgnorePlugin extends Plugin {
     settings: FileIgnoreSettings;
@@ -32,7 +24,7 @@ export default class FileIgnorePlugin extends Plugin {
 
     private initTranslations() {
         const obsidianLang = moment.locale();
-        let langKey: keyof typeof locales = 'en'; // Default to English
+        let langKey: keyof typeof locales = 'en';
 
         if (obsidianLang.startsWith('zh')) {
             langKey = (obsidianLang === 'zh-tw' || obsidianLang === 'zh-hk') ? 'zh-TW' : 'zh-CN';
@@ -48,87 +40,70 @@ export default class FileIgnorePlugin extends Plugin {
 
     async onload() {
         try {
-            // 1. 首先加载设置
             await this.loadSettings();
 
-            // Add a new Notice right after loading settings
-            // new Notice('Settings loaded!'); // <-- 移除测试 Notice
-
-            // 2. 现在可以安全地使用 settings 了
             if (this.settings.debug) {
                 console.debug('[file-ignore] Plugin loading started');
             }
 
-            // 3. 初始化国际化
             this.initTranslations();
 
-            // 4. 初始化文件系统
-            const adapter = (this.app.vault.adapter as unknown) as FileSystemAdapterExtended;
+            const adapter = this.app.vault.adapter as unknown as FileSystemAdapterExtended;
             const basePath = adapter.getBasePath();
 
-            if (this.settings.debug) {
-                console.debug('[file-ignore] Settings loaded:', this.settings);
-                console.debug('[file-ignore] FileOperations initialized');
-                console.debug('[file-ignore] LocalFileSystem initialized, base path:', basePath);
-            }
-
-            // 5. 初始化其他组件
             this.fileOps = new FileOperations(this.app.vault);
+            this.fileOps.setDebug(this.settings.debug || false);
             this.localFs = new LocalFileSystem(basePath);
 
-            // 6. 添加设置标签页
             this.addSettingTab(new FileIgnoreSettingTab(this.app, this));
-
-            // 7. 初始化翻译 （新增）
-            // const locale = moment.locale(); // <-- 使用 Obsidian 的 locale
-
-            // if (locale.startsWith('zh')) {
-            //     if (locale === 'zh-tw' || locale === 'zh-hk') {
-            //         this.t = locales['zh-TW'];
-            //     } else {
-            //         this.t = locales['zh-CN'];
-            //     }
-            // } else if (locale === 'ja') {
-            //     this.t = locales.ja;
-            // } else {
-            //     this.t = locales.en;
-            // }
-            // if (this.settings.debug) {
-            //     console.log('[file-ignore] Main locale:', locale);
-            // }
-
-            // 在这里添加 Notice 来显示检测到的 locale 和最终选择的翻译键
-            // const usedLocaleKey = Object.keys(locales).find(key => locales[key] === this.t) || 'unknown';
-            // new Notice(`Detected: ${locale}, Using: ${usedLocaleKey}`); // <-- 移除测试 Notice
-
-            // 按要求：删除设置页之外的所有操作入口（命令/右键菜单）。
+            this.maybeNotifyRecoveryState();
         } catch (error) {
             console.error('[file-ignore] Plugin loading error:', error);
         }
     }
 
     onunload() {
-        // 清理工作
         if (this.settings?.debug) {
             console.debug('[file-ignore] Plugin unloading...');
         }
-        // 清理文件操作实例
-        if (this.fileOps) {
-            this.fileOps = undefined;
-        }
-        // 清理本地文件系统实例
-        if (this.localFs) {
-            this.localFs = undefined;
-        }
+        this.fileOps = undefined;
+        this.localFs = undefined;
         if (this.settings?.debug) {
             console.debug('[file-ignore] Plugin unloaded');
         }
     }
 
+    private maybeNotifyRecoveryState() {
+        const batch = this.settings.lastBatch;
+        if (!batch) {
+            return;
+        }
+
+        if ((batch.status === 'running' || batch.status === 'failed') && batch.completed.length > 0) {
+            new Notice(
+                this.t.notice.recoveryAvailable?.(batch.completed.length)
+                ?? `Recovery available for ${batch.completed.length} item(s). Open File Ignore settings to undo the interrupted batch.`
+            );
+        }
+    }
+
     async loadSettings() {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-        if (!this.settings.rulesHistory) {
-            this.settings.rulesHistory = [];
+        this.settings.rulesHistory = Array.isArray(this.settings.rulesHistory) ? this.settings.rulesHistory : [];
+        this.settings.ignoredFiles = Array.isArray(this.settings.ignoredFiles) ? this.settings.ignoredFiles : [];
+        this.settings.lastBatch = this.settings.lastBatch ?? null;
+        if (!this.settings.rules || !this.settings.rules.trim()) {
+            this.settings.rules = DEFAULT_SETTINGS.rules;
+        }
+    }
+
+    private async persistState(triggerWorkspaceUpdate: boolean = false) {
+        await this.saveData(this.settings);
+        if (this.fileOps) {
+            this.fileOps.setDebug(this.settings.debug || false);
+        }
+        if (triggerWorkspaceUpdate) {
+            this.app.workspace.trigger('file-ignore:settings-update');
         }
     }
 
@@ -137,30 +112,82 @@ export default class FileIgnorePlugin extends Plugin {
             this.settings.rules = rulesToSave;
         }
 
-        // 只在 addToHistory 为 true，并且 settings.rules 有实际内容时才操作历史记录
-        if (addToHistory && this.settings.rules && this.settings.rules.trim() !== "") {
-            if (!this.settings.rulesHistory) {
-                this.settings.rulesHistory = [];
-            }
-            // 移除历史中已存在的相同规则，再添加到最前面
+        if (addToHistory && this.settings.rules && this.settings.rules.trim() !== '') {
             this.settings.rulesHistory = this.settings.rulesHistory.filter(r => r !== this.settings.rules);
             this.settings.rulesHistory.unshift(this.settings.rules);
-
-            // 保持历史记录最多为5条
             if (this.settings.rulesHistory.length > 5) {
                 this.settings.rulesHistory = this.settings.rulesHistory.slice(0, 5);
             }
         }
 
-        await this.saveData(this.settings);
-
-        if (this.fileOps) {
-            this.fileOps.setDebug(this.settings.debug || false);
-        }
-        this.app.workspace.trigger('file-ignore:settings-update');
+        await this.persistState(true);
     }
 
-    // 文件操作方法
+    public getRecoverableBatch(): PersistedBatchRecord | null {
+        const batch = this.settings.lastBatch;
+        if (!batch || batch.completed.length === 0 || batch.status === 'rolled-back') {
+            return null;
+        }
+        return batch;
+    }
+
+    public getRecoveryMode(batch: PersistedBatchRecord | null = this.getRecoverableBatch()): 'recover' | 'undo' {
+        if (!batch) {
+            return 'undo';
+        }
+        return batch.status === 'running' || batch.status === 'failed' ? 'recover' : 'undo';
+    }
+
+    private buildBatchRecord(action: BatchAction, rulesText: string, plan: RenamePlan): PersistedBatchRecord {
+        const now = Date.now();
+        const pending: FileOperation[] = plan.items.map(item => ({
+            oldPath: item.oldPath,
+            newPath: item.newPath,
+            timestamp: 0,
+        }));
+
+        return {
+            id: `${now.toString(36)}-${action}`,
+            action,
+            createdAt: now,
+            updatedAt: now,
+            rulesText,
+            plannedCount: plan.items.length,
+            skippedProtected: plan.skippedProtected,
+            skippedNested: plan.skippedNested,
+            skippedConflicts: plan.skippedConflicts,
+            completed: [],
+            pending,
+            status: 'running',
+        };
+    }
+
+    private async recordBatchProgress(batch: PersistedBatchRecord, operation: FileOperation) {
+        batch.completed.push(operation);
+        batch.pending = batch.pending.filter(item => !(item.oldPath === operation.oldPath && item.newPath === operation.newPath));
+        batch.updatedAt = Date.now();
+        this.settings.lastBatch = batch;
+        await this.persistState(false);
+    }
+
+    private notifyPlanWarnings(plan: RenamePlan) {
+        if (plan.skippedProtected > 0 && this.t.notice.protectedSkipped) {
+            new Notice(this.t.notice.protectedSkipped(plan.skippedProtected));
+        }
+        if (plan.skippedNested > 0) {
+            new Notice(
+                this.t.notice.nestedSkipped?.(plan.skippedNested)
+                ?? `${plan.skippedNested} nested item(s) skipped because their parent directory is already planned.`
+            );
+        }
+        if (plan.skippedConflicts > 0) {
+            new Notice(
+                this.t.notice.conflictsSkipped?.(plan.skippedConflicts)
+                ?? `${plan.skippedConflicts} item(s) skipped because the target path already exists or conflicts with another rename.`
+            );
+        }
+    }
+
     async addDotPrefix(file: TFile | TFolder) {
         try {
             const fileInfo = this.localFs?.getFileInfo(file.path);
@@ -191,13 +218,13 @@ export default class FileIgnorePlugin extends Plugin {
         }
     }
 
-    async applyRules(hide: boolean, precomputed?: { matches?: FileInfo[]; actionable?: FileInfo[]; skippedProtected?: number }) {
+    async applyRules(hide: boolean, precomputed?: { matches?: FileInfo[]; plan?: RenamePlan }) {
         if (!this.fileOps) {
             new Notice(this.t.notice.settingsErrorInit);
             return;
         }
         try {
-            const currentRulesText = this.settings.rules; // 获取当前规则文本以供保存到历史
+            const currentRulesText = this.settings.rules;
             const currentRulesArray = currentRulesText.split('\n')
                 .map(line => line.trim())
                 .filter(line => line && !line.startsWith('#'));
@@ -208,36 +235,55 @@ export default class FileIgnorePlugin extends Plugin {
             }
 
             const filesToProcess: FileInfo[] = precomputed?.matches ?? await this.fileOps.getFilesToProcess(currentRulesArray);
-            const actionable: FileInfo[] = precomputed?.actionable ?? filesToProcess.filter(f => !this.fileOps!.isProtectedPath(f.path));
-            const skippedProtected = precomputed?.skippedProtected ?? (filesToProcess.length - actionable.length);
             if (filesToProcess.length === 0) {
                 new Notice(this.t.notice.noMatches);
                 return;
             }
 
+            const plan = precomputed?.plan ?? this.fileOps.buildRenamePlan(filesToProcess, hide);
+            this.notifyPlanWarnings(plan);
+
+            if (plan.items.length === 0) {
+                new Notice(this.t.notice.noActionNeeded);
+                console.info('[file-ignore][audit]', 'batch-summary', {
+                    action: hide ? 'hide' : 'show',
+                    totalMatched: filesToProcess.length,
+                    planned: 0,
+                    changed: 0,
+                    failed: 0,
+                    skippedProtected: plan.skippedProtected,
+                    skippedNested: plan.skippedNested,
+                    skippedConflicts: plan.skippedConflicts,
+                    noopCount: plan.noopCount,
+                });
+                return;
+            }
+
+            const action: BatchAction = hide ? 'hide' : 'show';
+            const batch = this.buildBatchRecord(action, currentRulesText, plan);
+            this.settings.lastBatch = batch;
+            await this.persistState(false);
+
             let changedCount = 0;
+            let failedCount = 0;
             let processedCount = 0;
-            let result: { success: boolean; error?: string } | undefined;
 
-            for (const fileInfo of actionable) {
-                const isCurrentlyHidden = fileInfo.name.startsWith('.');
-                const shouldHide = hide && !isCurrentlyHidden;
-                const shouldShow = !hide && isCurrentlyHidden;
-                result = undefined;
-
-                if (shouldHide) {
-                    result = await this.fileOps.addDotPrefix(fileInfo, true);
-                } else if (shouldShow) {
-                    result = await this.fileOps.addDotPrefix(fileInfo, false);
-                }
-
-                if (result) {
-                    if (result.success) {
-                        changedCount++;
-                    } else {
-                        const errorMessage = result.error || this.t.notice.unknownError || 'Unknown error during file operation';
-                        new Notice(`${this.t.notice[hide ? 'hideError' : 'showError']} ${fileInfo.path}: ${errorMessage}`);
-                    }
+            for (const item of plan.items) {
+                const result = await this.fileOps.executePlanItem(item, action);
+                if (result.success) {
+                    changedCount++;
+                    await this.recordBatchProgress(batch, {
+                        oldPath: item.oldPath,
+                        newPath: item.newPath,
+                        timestamp: Date.now(),
+                    });
+                } else {
+                    failedCount++;
+                    batch.status = 'failed';
+                    batch.lastError = result.error || this.t.notice.unknownError || 'Unknown error during file operation';
+                    this.settings.lastBatch = batch;
+                    await this.persistState(false);
+                    new Notice(`${this.t.notice[hide ? 'hideError' : 'showError']} ${item.oldPath}: ${batch.lastError}`);
                 }
 
                 processedCount++;
@@ -246,31 +292,38 @@ export default class FileIgnorePlugin extends Plugin {
                 }
             }
 
+            batch.updatedAt = Date.now();
+            batch.status = failedCount > 0 ? 'failed' : 'completed';
+            this.settings.lastBatch = batch;
+
             if (changedCount > 0) {
                 new Notice(hide ? this.t.notice.applied(changedCount) : this.t.notice.reverted(changedCount));
-                // 既然规则被实际应用并导致了文件更改，确保当前规则在历史记录中
-                // 使用 currentRulesText，因为 this.settings.rules 可能在异步操作中被其他地方修改
                 await this.saveSettings(currentRulesText, true);
-                if (skippedProtected > 0 && this.t.notice.protectedSkipped) {
-                    new Notice(this.t.notice.protectedSkipped(skippedProtected));
-                }
             } else {
-                if (skippedProtected > 0 && this.t.notice.protectedSkipped) {
-                    new Notice(this.t.notice.protectedSkipped(skippedProtected));
-                } else {
-                    new Notice(this.t.notice.noActionNeeded);
-                }
+                await this.persistState(true);
+            }
+
+            if (failedCount > 0) {
+                new Notice(
+                    this.t.notice.partialFailure?.(failedCount)
+                    ?? `${failedCount} item(s) failed. Check the developer console for details.`
+                );
             }
 
             console.info('[file-ignore][audit]', 'batch-summary', {
-                action: hide ? 'hide' : 'show',
+                action,
                 totalMatched: filesToProcess.length,
-                actionable: actionable.length,
+                planned: plan.items.length,
                 changed: changedCount,
-                skippedProtected
+                failed: failedCount,
+                skippedProtected: plan.skippedProtected,
+                skippedNested: plan.skippedNested,
+                skippedConflicts: plan.skippedConflicts,
+                noopCount: plan.noopCount,
+                batchId: batch.id,
+                status: batch.status,
             });
-
-        } catch (error) {
+        } catch (error: any) {
             console.error('[file-ignore] Error in applyRules:', error);
             new Notice(this.t.notice.applyError(error.message));
         }
@@ -278,15 +331,25 @@ export default class FileIgnorePlugin extends Plugin {
 
     async rollback() {
         try {
-            // Assuming fileOps.rollback() handles the core logic of undoing changes.
+            const batch = this.getRecoverableBatch();
+            if (batch && this.fileOps) {
+                await this.fileOps.rollbackBatch(batch.completed);
+                batch.status = 'rolled-back';
+                batch.pending = [];
+                batch.updatedAt = Date.now();
+                this.settings.lastBatch = batch;
+                await this.persistState(true);
+                new Notice(this.t.notice.rollbackSuccess);
+                this.app.workspace.requestSaveLayout();
+                return;
+            }
+
             await this.fileOps?.rollback();
             new Notice(this.t.notice.rollbackSuccess);
-            // Correctly refresh the file explorer
             this.app.workspace.requestSaveLayout();
-        } catch (error) {
+        } catch (error: any) {
             console.error('[file-ignore] Rollback operation failed:', error);
             new Notice(this.t.notice.rollbackError(error.message || this.t.notice.unknownError));
-            // Do not rethrow here for the same reasons as applyRules
         }
     }
-} 
+}

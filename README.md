@@ -46,8 +46,9 @@ Supports the following matching patterns:
 
 After configuring rules in the plugin settings page, you can:
 
-- Click **"Hide Files"**: Adds a "." prefix to all files/folders matching the rules.
-- Click **"Show Files"**: Removes the "." prefix from all files/folders matching the rules.
+- Click **"Hide Files"**: Builds a rename plan, shows a preview, and then adds a "." prefix to matching files/folders.
+- Click **"Show Files"**: Builds a rename plan, shows a preview, and then removes the "." prefix from matching files/folders.
+- If a batch is interrupted, use the **Recovery** action in settings to undo the already-completed part safely.
 
 ### How to Configure?
 Configure your ignore rules in Obsidian's `Settings` -> `Community plugins` -> `File Ignore` settings page.
@@ -67,8 +68,11 @@ Recommended to use with the [Show-Hide-Files](https://github.com/polyipseity/obs
 
 ## 🔒 Safety Notes
 
-- File Ignore never deletes content. Hide/Show only renames entries by toggling a leading dot, and protected areas such as `.obsidian/`, `.git/`, and `.trash/` are skipped automatically.
+- **Important:** File Ignore works by renaming files and folders on disk. It is not a native Obsidian exclude API.
+- Hide/Show now builds a rename plan before execution and skips protected areas such as `.obsidian/`, `.git/`, and `.trash/` automatically.
 - When the destination name already exists (for example, both `foo.md` and `.foo.md` are present), the plugin aborts the rename and emits an audit log instead of overwriting either file.
+- Nested children are skipped when their parent directory is already scheduled for renaming, which avoids double-processing the same subtree.
+- The latest batch is persisted so interrupted runs can be undone from the settings page.
 - Each rename records a `[file-ignore][audit]` line in the developer console, making it easy to trace which paths were changed if something looks wrong.
 
 ## 🧪 Debugging & Troubleshooting
