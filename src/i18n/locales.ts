@@ -72,6 +72,10 @@ export interface Translation {
         rulesAppliedAndScanned?: string; // 新增：规则已应用并扫描通知
         ruleLoadedFromHistory?: string; // 新增
         protectedSkipped?: (count: number) => string; // 新增: 受保护路径跳过提示
+        nestedSkipped?: (count: number) => string;
+        conflictsSkipped?: (count: number) => string;
+        partialFailure?: (count: number) => string;
+        recoveryAvailable?: (count: number) => string;
     };
     // 按钮文本 (新增)
     buttons?: {
@@ -81,6 +85,7 @@ export interface Translation {
     matchedListSummary?: {
         itemsMatched: (count: number) => string;
         itemsHidden: (count: number) => string;
+        displayingNofM?: (shown: number, total: number) => string;
     };
     // 确认对话框
     confirm?: {
@@ -89,8 +94,19 @@ export interface Translation {
         summaryHide: (count: number) => string;
         summaryShow: (count: number) => string;
         protectedWarning: (count: number) => string;
+        nestedWarning?: (count: number) => string;
+        conflictWarning?: (count: number) => string;
+        previewTitle?: string;
+        previewMore?: (count: number) => string;
         proceed: string;
         cancel: string;
+    };
+    recovery?: {
+        title: string;
+        interruptedDesc: (completed: number, pending: number) => string;
+        completedDesc: (completed: number) => string;
+        buttonRecover: string;
+        buttonUndo: string;
     };
     debugToggle?: {
         name: string;
@@ -173,6 +189,10 @@ export const en: Translation = {
         rollbackError: (message) => `Rollback failed: ${message}`,
         noActionNeeded: 'No files needed to be changed based on the current rules.',
         protectedSkipped: (count) => `${count} protected item(s) skipped`,
+        nestedSkipped: (count) => `${count} nested item(s) skipped because their parent directory is already planned`,
+        conflictsSkipped: (count) => `${count} item(s) skipped because the target path already exists or conflicts with another rename`,
+        partialFailure: (count) => `${count} item(s) failed. Check the developer console for details.`,
+        recoveryAvailable: (count) => `Recovery available for ${count} item(s). Open File Ignore settings to undo the interrupted batch.`,
         rulesAppliedAndScanned: "Rules applied and files scanned!",
         ruleLoadedFromHistory: "Rule loaded from history.",
     },
@@ -182,6 +202,7 @@ export const en: Translation = {
     matchedListSummary: {
         itemsMatched: (count) => `${count} ${count === 1 ? 'item' : 'items'} matched`,
         itemsHidden: (count) => `${count} ${count === 1 ? 'item' : 'items'} hidden`,
+        displayingNofM: (shown, total) => `List is long, only showing the first ${shown} items (of ${total}). Hide/Show will still affect all matched items.`,
     },
     confirm: {
         titleHide: 'Confirm Hide',
@@ -189,8 +210,19 @@ export const en: Translation = {
         summaryHide: (count) => `Add a dot prefix to ${count} item(s).`,
         summaryShow: (count) => `Remove the dot prefix from ${count} item(s).`,
         protectedWarning: (count) => `${count} protected item(s) will be skipped`,
+        nestedWarning: (count) => `${count} nested item(s) will be skipped because their parent directory is already in the plan.`,
+        conflictWarning: (count) => `${count} item(s) will be skipped because the target path already exists or conflicts with another rename.`,
+        previewTitle: 'Planned renames',
+        previewMore: (count) => `…and ${count} more.`,
         proceed: 'Proceed',
         cancel: 'Cancel',
+    },
+    recovery: {
+        title: 'Recovery',
+        interruptedDesc: (completed, pending) => `${completed} item(s) were already renamed before the last batch stopped. ${pending} item(s) remain pending.`,
+        completedDesc: (completed) => `Undo the last completed batch (${completed} renamed item(s)).`,
+        buttonRecover: 'Undo interrupted batch',
+        buttonUndo: 'Undo last batch',
     },
     debugToggle: {
         name: 'Debug Logging',
@@ -272,6 +304,10 @@ export const zhCN: Translation = {
         rollbackError: (message) => `回滚失败: ${message}`,
         noActionNeeded: '根据当前规则，没有文件需要更改。',
         protectedSkipped: (count) => `已跳过 ${count} 个受保护路径`,
+        nestedSkipped: (count) => `已跳过 ${count} 个嵌套项目，因为其父目录已在计划中`,
+        conflictsSkipped: (count) => `已跳过 ${count} 个项目，因为目标路径已存在或与其他重命名冲突`,
+        partialFailure: (count) => `${count} 个项目执行失败，请查看开发者控制台。`,
+        recoveryAvailable: (count) => `检测到 ${count} 个项目可恢复。打开 File Ignore 设置即可撤销上次中断的批处理。`,
         rulesAppliedAndScanned: "规则已应用且文件已扫描！",
         ruleLoadedFromHistory: "已从历史记录加载规则。",
     },
@@ -281,6 +317,7 @@ export const zhCN: Translation = {
     matchedListSummary: {
         itemsMatched: (count) => `共 ${count} 个项目匹配`,
         itemsHidden: (count) => `其中 ${count} 个项目已隐藏`,
+        displayingNofM: (shown, total) => `列表过长，仅显示前 ${shown} 项（共 ${total} 项）。隐藏/显示操作仍会作用于全部匹配项。`,
     },
     confirm: {
         titleHide: '确认隐藏',
@@ -288,8 +325,19 @@ export const zhCN: Translation = {
         summaryHide: (count) => `将为 ${count} 个项目添加点前缀。`,
         summaryShow: (count) => `将为 ${count} 个项目移除点前缀。`,
         protectedWarning: (count) => `其中 ${count} 个受保护路径将被跳过`,
+        nestedWarning: (count) => `${count} 个嵌套项目将被跳过，因为其父目录已在计划中。`,
+        conflictWarning: (count) => `${count} 个项目将被跳过，因为目标路径已存在或与其他重命名冲突。`,
+        previewTitle: '计划中的重命名',
+        previewMore: (count) => `……以及另外 ${count} 项。`,
         proceed: '继续',
         cancel: '取消',
+    },
+    recovery: {
+        title: '恢复',
+        interruptedDesc: (completed, pending) => `上次批处理中断前已重命名 ${completed} 个项目，仍有 ${pending} 个项目未完成。`,
+        completedDesc: (completed) => `撤销上一次已完成的批处理（共 ${completed} 个重命名项目）。`,
+        buttonRecover: '撤销中断批处理',
+        buttonUndo: '撤销上次批处理',
     },
     debugToggle: {
         name: '调试日志',
@@ -371,6 +419,10 @@ export const zhTW: Translation = {
         rollbackError: (message) => `還原失敗: ${message}`,
         noActionNeeded: '根據目前規則，沒有檔案需要變更。',
         protectedSkipped: (count) => `已跳過 ${count} 個受保護路徑`,
+        nestedSkipped: (count) => `已跳過 ${count} 個巢狀項目，因為其父目錄已在計畫中`,
+        conflictsSkipped: (count) => `已跳過 ${count} 個項目，因為目標路徑已存在或與其他重新命名衝突`,
+        partialFailure: (count) => `${count} 個項目執行失敗，請查看開發者控制台。`,
+        recoveryAvailable: (count) => `偵測到 ${count} 個項目可恢復。開啟 File Ignore 設定即可撤銷上次中斷的批次。`,
         rulesAppliedAndScanned: "規則已套用且檔案已掃描！",
         ruleLoadedFromHistory: "已從歷史記錄載入規則。",
     },
@@ -380,6 +432,7 @@ export const zhTW: Translation = {
     matchedListSummary: {
         itemsMatched: (count) => `共 ${count} 個項目符合`,
         itemsHidden: (count) => `其中 ${count} 個項目已隱藏`,
+        displayingNofM: (shown, total) => `列表過長，僅顯示前 ${shown} 項（共 ${total} 項）。隱藏/顯示操作仍會作用於全部符合項目。`,
     },
     confirm: {
         titleHide: '確認隱藏',
@@ -387,8 +440,19 @@ export const zhTW: Translation = {
         summaryHide: (count) => `將為 ${count} 個項目新增點字首。`,
         summaryShow: (count) => `將為 ${count} 個項目移除點字首。`,
         protectedWarning: (count) => `其中 ${count} 個受保護路徑將被略過`,
+        nestedWarning: (count) => `${count} 個巢狀項目將被略過，因為其父目錄已在計畫中。`,
+        conflictWarning: (count) => `${count} 個項目將被略過，因為目標路徑已存在或與其他重新命名衝突。`,
+        previewTitle: '計畫中的重新命名',
+        previewMore: (count) => `……以及另外 ${count} 項。`,
         proceed: '繼續',
         cancel: '取消',
+    },
+    recovery: {
+        title: '恢復',
+        interruptedDesc: (completed, pending) => `上次批次中斷前已重新命名 ${completed} 個項目，仍有 ${pending} 個項目未完成。`,
+        completedDesc: (completed) => `撤銷上一次已完成的批次（共 ${completed} 個重新命名項目）。`,
+        buttonRecover: '撤銷中斷批次',
+        buttonUndo: '撤銷上次批次',
     },
     debugToggle: {
         name: '偵錯日誌',
