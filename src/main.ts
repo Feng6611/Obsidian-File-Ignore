@@ -234,13 +234,26 @@ export default class FileIgnorePlugin extends Plugin {
                 return;
             }
 
-            const filesToProcess: FileInfo[] = precomputed?.matches ?? await this.fileOps.getFilesToProcess(currentRulesArray);
+            let filesToProcess: FileInfo[] = precomputed?.matches ?? await this.fileOps.getFilesToProcess(currentRulesArray);
+
+            // Fix #11: only restore files actually hidden by this plugin
+            if (!hide) {
+                const batch = this.getRecoverableBatch();
+                if (batch && batch.action === 'hide' && batch.completed.length > 0) {
+                    const pluginHiddenPaths = new Set(batch.completed.map(op => op.newPath));
+                    filesToProcess = filesToProcess.filter(f => pluginHiddenPaths.has(f.path));
+                } else {
+                    filesToProcess = filesToProcess.filter(f => !f.name.startsWith('.'));
+                }
+            }
+
             if (filesToProcess.length === 0) {
                 new Notice(this.t.notice.noMatches);
                 return;
             }
 
-            const plan = precomputed?.plan ?? this.fileOps.buildRenamePlan(filesToProcess, hide);
+            // Rebuild plan when showing since filesToProcess may have been filtered
+            const plan = (hide && precomputed?.plan) ? precomputed.plan : this.fileOps.buildRenamePlan(filesToProcess, hide);
             this.notifyPlanWarnings(plan);
 
             if (plan.items.length === 0) {
