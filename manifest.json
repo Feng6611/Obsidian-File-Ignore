@@ -1,11 +1,11 @@
 {
-    "id": "file-ignore",
-    "name": "File Ignore",
-    "version": "1.1.0",
-    "minAppVersion": "0.15.0",
-    "description": "Control file indexing by adding or removing dot prefix to show or hide files, providing a .gitignore-like experience",
-    "main": "main.js",
-    "author": "Chen",
-    "authorUrl": "https://github.com/feng6611",
-    "isDesktopOnly": true
-} 
+	"id": "file-ignore",
+	"name": "File Ignore",
+	"version": "1.1.1",
+	"minAppVersion": "0.15.0",
+	"description": "Control file indexing by adding or removing dot prefix to show or hide files, providing a .gitignore-like experience",
+	"main": "main.js",
+	"author": "Chen",
+	"authorUrl": "https://github.com/feng6611",
+	"isDesktopOnly": true
+}
