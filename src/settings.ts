@@ -161,25 +161,17 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
             return null;
         }
 
-        let matched = await this.plugin.fileOps.getFilesToProcess(currentRules);
-
-        // Fix #11: only restore files actually hidden by this plugin
-        if (!hide) {
-            const batch = this.plugin.getRecoverableBatch();
-            if (batch && batch.action === 'hide' && batch.completed.length > 0) {
-                const pluginHiddenPaths = new Set(batch.completed.map(op => op.newPath));
-                matched = matched.filter(f => pluginHiddenPaths.has(f.path));
-            } else {
-                matched = matched.filter(f => !f.name.startsWith('.'));
-            }
-        }
-
+        const recoverableBatch = this.plugin.getRecoverableBatch();
+        const rawMatched = await this.plugin.fileOps.getFilesToProcess(currentRules);
+        const matched = hide
+            ? rawMatched
+            : this.plugin.fileOps.filterRestorableFiles(rawMatched, recoverableBatch);
         if (matched.length === 0) {
             new Notice(this.t.notice.noMatches);
             return null;
         }
 
-        const plan = this.plugin.fileOps.buildRenamePlan(matched, hide);
+        const plan = this.plugin.fileOps.buildRenamePlan(matched, hide, recoverableBatch);
         return { matched, plan };
     }
 

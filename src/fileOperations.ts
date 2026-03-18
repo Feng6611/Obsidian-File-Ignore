@@ -3,7 +3,7 @@ import minimatch from 'minimatch';
 import { LocalFileSystem, FileInfo } from './localFileSystem';
 import path from 'path';
 import fs from 'fs';
-import type { BatchAction, FileOperation } from './types';
+import type { BatchAction, FileOperation, PersistedBatchRecord } from './types';
 
 interface FileSystemAdapterExtended {
     getBasePath(): string;
@@ -38,6 +38,12 @@ export interface RenamePlan {
     skippedConflicts: number;
     items: RenamePlanItem[];
     conflicts: RenamePlanConflict[];
+}
+
+interface RenameResult {
+    success: boolean;
+    changed: boolean;
+    error?: string;
 }
 
 export class FileOperations {
@@ -123,7 +129,80 @@ export class FileOperations {
         return path.basename(this.normalizePath(relPath)).startsWith('.');
     }
 
-    private computeRenamedPath(currentPath: string, isAdd: boolean): string | null {
+    private isHideTransition(oldPath: string, newPath: string): boolean {
+        return !this.isHiddenPath(oldPath) && this.isHiddenPath(newPath);
+    }
+
+    private isShowTransition(oldPath: string, newPath: string): boolean {
+        return this.isHiddenPath(oldPath) && !this.isHiddenPath(newPath);
+    }
+
+    private findPendingShowTarget(currentPath: string, persistedBatch?: PersistedBatchRecord | null): string | null {
+        if (!persistedBatch || persistedBatch.action !== 'show' || persistedBatch.pending.length === 0) {
+            return null;
+        }
+
+        const normalizedCurrentPath = this.normalizePath(currentPath);
+        for (let i = persistedBatch.pending.length - 1; i >= 0; i--) {
+            const pending = persistedBatch.pending[i];
+            if (
+                this.normalizePath(pending.oldPath) === normalizedCurrentPath
+                && this.isShowTransition(pending.oldPath, pending.newPath)
+            ) {
+                return this.normalizePath(pending.newPath);
+            }
+        }
+
+        return null;
+    }
+
+    private findRecordedRestoreTarget(currentPath: string, persistedBatch?: PersistedBatchRecord | null): string | null {
+        const normalizedCurrentPath = this.normalizePath(currentPath);
+        if (!this.isHiddenPath(normalizedCurrentPath)) {
+            return null;
+        }
+
+        const pendingShowTarget = this.findPendingShowTarget(normalizedCurrentPath, persistedBatch);
+        if (pendingShowTarget) {
+            return pendingShowTarget;
+        }
+
+        for (let i = this.operations.length - 1; i >= 0; i--) {
+            const operation = this.operations[i];
+            if (
+                this.normalizePath(operation.newPath) === normalizedCurrentPath
+                && this.isHideTransition(operation.oldPath, operation.newPath)
+            ) {
+                return this.normalizePath(operation.oldPath);
+            }
+        }
+
+        if (!persistedBatch) {
+            return null;
+        }
+
+        for (let i = persistedBatch.completed.length - 1; i >= 0; i--) {
+            const operation = persistedBatch.completed[i];
+            if (
+                this.normalizePath(operation.newPath) === normalizedCurrentPath
+                && this.isHideTransition(operation.oldPath, operation.newPath)
+            ) {
+                return this.normalizePath(operation.oldPath);
+            }
+        }
+
+        return null;
+    }
+
+    public canRestorePath(relPath: string, persistedBatch?: PersistedBatchRecord | null): boolean {
+        return this.findRecordedRestoreTarget(relPath, persistedBatch) !== null;
+    }
+
+    public filterRestorableFiles(files: FileInfo[], persistedBatch?: PersistedBatchRecord | null): FileInfo[] {
+        return files.filter(fileInfo => this.canRestorePath(fileInfo.path, persistedBatch));
+    }
+
+    private computeRenamedPath(currentPath: string, isAdd: boolean, persistedBatch?: PersistedBatchRecord | null): string | null {
         const normalizedCurrentPath = this.normalizePath(currentPath);
         const baseName = path.basename(normalizedCurrentPath);
         const dirName = path.dirname(normalizedCurrentPath);
@@ -139,7 +218,12 @@ export class FileOperations {
             return null;
         }
 
-        return this.normalizePath(path.join(dirName, baseName.substring(1)));
+        const recordedTarget = this.findRecordedRestoreTarget(normalizedCurrentPath, persistedBatch);
+        if (recordedTarget) {
+            return recordedTarget;
+        }
+
+        return null;
     }
 
     private pathDepth(relPath: string): number {
@@ -315,7 +399,7 @@ export class FileOperations {
         return matchedItems;
     }
 
-    public buildRenamePlan(files: FileInfo[], hide: boolean): RenamePlan {
+    public buildRenamePlan(files: FileInfo[], hide: boolean, persistedBatch?: PersistedBatchRecord | null): RenamePlan {
         const action: BatchAction = hide ? 'hide' : 'show';
         const plan: RenamePlan = {
             action,
@@ -332,7 +416,7 @@ export class FileOperations {
             .map(fileInfo => ({
                 fileInfo,
                 oldPath: this.normalizePath(fileInfo.path),
-                newPath: this.computeRenamedPath(fileInfo.path, hide),
+                newPath: this.computeRenamedPath(fileInfo.path, hide, persistedBatch),
             }))
             .sort((a, b) => {
                 if (a.fileInfo.isDirectory !== b.fileInfo.isDirectory) {
@@ -415,13 +499,13 @@ export class FileOperations {
         sourcePath: string,
         targetPath: string,
         context: { action: BatchAction | 'rollback'; recordInMemory?: boolean }
-    ): Promise<{ success: boolean; error?: string }> {
+    ): Promise<RenameResult> {
         const vaultCurrentPath = this.normalizePath(sourcePath);
         const vaultNewPath = this.normalizePath(targetPath);
 
         if (vaultNewPath === vaultCurrentPath) {
             this.debug(`New path "${vaultNewPath}" is identical to current path "${vaultCurrentPath}". No rename needed.`);
-            return { success: true };
+            return { success: true, changed: false };
         }
 
         const targetFullPath = this.localFs.getFullPath(vaultNewPath);
@@ -433,7 +517,7 @@ export class FileOperations {
                 source: vaultCurrentPath,
                 target: vaultNewPath
             });
-            return { success: false, error: errorMsg };
+            return { success: false, changed: false, error: errorMsg };
         }
 
         try {
@@ -454,7 +538,7 @@ export class FileOperations {
                         source: vaultCurrentPath,
                         target: vaultNewPath
                     });
-                    return { success: false, error: errorMsg };
+                    return { success: false, changed: false, error: errorMsg };
                 }
             }
 
@@ -468,7 +552,7 @@ export class FileOperations {
                 source: vaultCurrentPath,
                 target: vaultNewPath
             });
-            return { success: true };
+            return { success: true, changed: true };
         } catch (error: any) {
             const errorMsg = `Error renaming "${vaultCurrentPath}" to "${vaultNewPath}": ${error.message}`;
             this.debug(errorMsg, error);
@@ -478,22 +562,26 @@ export class FileOperations {
                 target: vaultNewPath,
                 message: error?.message ?? String(error)
             });
-            return { success: false, error: errorMsg };
+            return { success: false, changed: false, error: errorMsg };
         }
     }
 
-    public async executePlanItem(item: RenamePlanItem, action: BatchAction): Promise<{ success: boolean; error?: string }> {
+    public async executePlanItem(item: RenamePlanItem, action: BatchAction): Promise<RenameResult> {
         return this.renamePaths(item.oldPath, item.newPath, { action, recordInMemory: true });
     }
 
-    public async addDotPrefix(fileInfo: FileInfo, isAdd: boolean = true): Promise<{ success: boolean; error?: string }> {
+    public async addDotPrefix(
+        fileInfo: FileInfo,
+        isAdd: boolean = true,
+        persistedBatch?: PersistedBatchRecord | null
+    ): Promise<RenameResult> {
         if (this.isProtectedPath(fileInfo.path)) {
-            return { success: false, error: `Protected path: ${fileInfo.path}` };
+            return { success: false, changed: false, error: `Protected path: ${fileInfo.path}` };
         }
 
-        const newPath = this.computeRenamedPath(fileInfo.path, isAdd);
+        const newPath = this.computeRenamedPath(fileInfo.path, isAdd, persistedBatch);
         if (!newPath) {
-            return { success: true };
+            return { success: true, changed: false };
         }
 
         return this.renamePaths(fileInfo.path, newPath, {
