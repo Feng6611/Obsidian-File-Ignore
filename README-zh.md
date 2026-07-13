@@ -66,7 +66,9 @@ obsidian-file-ignore.kkuk.dev
 
 如果您在使用过程中遇到任何问题或有改进建议，欢迎访问我们的 [GitHub 仓库](https://github.com/Feng6611/Obsidian-File-Ignore) 提交 Issue
 
-您也可以通过给我买杯咖啡来支持我：[请我喝咖啡](https://buymeacoffee.com/RDzWpfRwLU)
+我是 [chenfeng](https://github.com/Feng6611)——除了 Obsidian 插件，我也做小而轻权限的 Mac 工具，比如修复 Cmd+Tab 不恢复最小化窗口的 [Command Reopen](https://commandreopen.com)。
+
+您也可以通过给我买杯咖啡来支持我：[请我喝咖啡](https://buymeacoffee.com/kkuk)
 
 ## 📄 许可证 (License)
 

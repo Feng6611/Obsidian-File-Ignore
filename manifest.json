@@ -5,7 +5,8 @@
 	"minAppVersion": "0.15.0",
 	"description": "Control file indexing by adding or removing dot prefix to show or hide files, providing a .gitignore-like experience",
 	"main": "main.js",
-	"author": "Chen",
-	"authorUrl": "https://github.com/feng6611",
+	"author": "chenfeng",
+	"authorUrl": "https://github.com/Feng6611",
+	"fundingUrl": "https://buymeacoffee.com/kkuk",
 	"isDesktopOnly": true
 }
