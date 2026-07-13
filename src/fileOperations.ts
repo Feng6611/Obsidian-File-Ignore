@@ -3,7 +3,7 @@ import minimatch from 'minimatch';
 import { LocalFileSystem, FileInfo } from './localFileSystem';
 import path from 'path';
 import fs from 'fs';
-import type { BatchAction, FileOperation, PersistedBatchRecord } from './types';
+import type { BatchAction, FileIdentity, FileOperation, PersistedBatchRecord, RollbackResult } from './types';
 
 interface FileSystemAdapterExtended {
     getBasePath(): string;
@@ -40,10 +40,11 @@ export interface RenamePlan {
     conflicts: RenamePlanConflict[];
 }
 
-interface RenameResult {
+export interface RenameResult {
     success: boolean;
     changed: boolean;
     error?: string;
+    operation?: FileOperation;
 }
 
 export class FileOperations {
@@ -51,7 +52,7 @@ export class FileOperations {
     private localFs: LocalFileSystem;
     private operations: FileOperation[] = [];
     private DEBUG = false;
-    private fileCache: { items: FileInfo[]; timestamp: number } | null = null;
+    private fileCache: { items: FileInfo[]; timestamp: number; key: string } | null = null;
     private static CACHE_TTL = 2000;
     private static PROTECTED_PREFIXES = [
         '.obsidian',
@@ -105,24 +106,51 @@ export class FileOperations {
         return relPath.replace(/\\/g, '/').replace(/^\.\//, '');
     }
 
-    private getAllFilesRecursively(currentPath: string = ''): FileInfo[] {
-        if (currentPath === '' && this.fileCache && (Date.now() - this.fileCache.timestamp) < FileOperations.CACHE_TTL) {
+    private getAllFilesRecursively(currentPath: string = '', rules: Rule[] = []): FileInfo[] {
+        const cacheKey = `${currentPath}\n${rules.map(rule => `${rule.negate ? '!' : ''}${rule.pattern}`).join('\n')}`;
+        if (
+            currentPath === ''
+            && this.fileCache
+            && this.fileCache.key === cacheKey
+            && (Date.now() - this.fileCache.timestamp) < FileOperations.CACHE_TTL
+        ) {
             return this.fileCache.items;
         }
 
-        const items = this.localFs.getAllFiles(currentPath);
+        const items = this.localFs.getAllFiles(
+            currentPath,
+            fileInfo => this.shouldDescendIntoDirectory(fileInfo, rules)
+        );
 
         if (currentPath === '') {
-            this.fileCache = { items, timestamp: Date.now() };
+            this.fileCache = { items, timestamp: Date.now(), key: cacheKey };
         }
 
         return items;
     }
 
+    private shouldDescendIntoDirectory(fileInfo: FileInfo, rules: Rule[]): boolean {
+        if (this.isProtectedPath(fileInfo.path)) {
+            return false;
+        }
+
+        const positiveRuleMatches = rules.some(rule => !rule.negate && this.matchesRule(fileInfo, rule));
+        if (!positiveRuleMatches) {
+            // A directory that is not itself ignored may contain a matching child.
+            return true;
+        }
+
+        // Keep a matched directory available when negation rules may re-include
+        // one of its children. Unrelated directories can still be pruned.
+        return rules.some(rule => rule.negate);
+    }
+
     public isProtectedPath(relPath: string): boolean {
         const normalized = this.normalizePath(relPath);
-        const top = normalized.split('/')[0];
-        return FileOperations.PROTECTED_PREFIXES.includes(top);
+        return normalized
+            .split('/')
+            .filter(Boolean)
+            .some(segment => FileOperations.PROTECTED_PREFIXES.includes(segment));
     }
 
     public isHiddenPath(relPath: string): boolean {
@@ -285,8 +313,8 @@ export class FileOperations {
     }
 
     private async _getFilesToProcess(rulesText: string[]): Promise<FileInfo[]> {
-        const allFiles = this.getAllFilesRecursively();
         const parsedRules = this.parseRules(rulesText.join('\n'));
+        const allFiles = this.getAllFilesRecursively('', parsedRules);
 
         if (this.DEBUG) {
             this.debug('Parsed rules:', parsedRules);
@@ -498,7 +526,11 @@ export class FileOperations {
     private async renamePaths(
         sourcePath: string,
         targetPath: string,
-        context: { action: BatchAction | 'rollback'; recordInMemory?: boolean }
+        context: {
+            action: BatchAction | 'rollback';
+            recordInMemory?: boolean;
+            expectedIdentity?: FileIdentity;
+        }
     ): Promise<RenameResult> {
         const vaultCurrentPath = this.normalizePath(sourcePath);
         const vaultNewPath = this.normalizePath(targetPath);
@@ -523,6 +555,16 @@ export class FileOperations {
         try {
             this.debug(`Attempting to rename "${vaultCurrentPath}" to "${vaultNewPath}"`);
             const sourceFullPath = this.localFs.getFullPath(vaultCurrentPath);
+            if (context.expectedIdentity && !this.matchesFileIdentity(vaultCurrentPath, context.expectedIdentity)) {
+                const errorMsg = `Source path changed before rename: "${vaultCurrentPath}"`;
+                this.audit('warn', 'rename-source-identity-mismatch', {
+                    operation: context.action,
+                    source: vaultCurrentPath,
+                    target: vaultNewPath,
+                });
+                return { success: false, changed: false, error: errorMsg };
+            }
+
             const file = this.vault.getAbstractFileByPath(vaultCurrentPath);
             if (file) {
                 await this.vault.rename(file, vaultNewPath);
@@ -543,8 +585,14 @@ export class FileOperations {
             }
 
             this.debug(`Successfully renamed "${vaultCurrentPath}" to "${vaultNewPath}"`);
+            const operation: FileOperation = {
+                oldPath: vaultCurrentPath,
+                newPath: vaultNewPath,
+                timestamp: Date.now(),
+                identity: this.getFileIdentity(vaultNewPath),
+            };
             if (context.recordInMemory !== false) {
-                this.operations.push({ oldPath: vaultCurrentPath, newPath: vaultNewPath, timestamp: Date.now() });
+                this.operations.push(operation);
             }
             this.invalidateFileCache();
             this.audit('info', 'rename-completed', {
@@ -552,7 +600,7 @@ export class FileOperations {
                 source: vaultCurrentPath,
                 target: vaultNewPath
             });
-            return { success: true, changed: true };
+            return { success: true, changed: true, operation };
         } catch (error: any) {
             const errorMsg = `Error renaming "${vaultCurrentPath}" to "${vaultNewPath}": ${error.message}`;
             this.debug(errorMsg, error);
@@ -590,13 +638,16 @@ export class FileOperations {
         });
     }
 
-    public async rollbackBatch(operations: FileOperation[]): Promise<void> {
+    public async rollbackBatch(operations: FileOperation[]): Promise<RollbackResult> {
         const reversed = [...operations].reverse();
         this.debug('Rolling back batch containing operations:', reversed.map(op => `${op.newPath} -> ${op.oldPath}`));
+        const validOperations: FileOperation[] = [];
+        let skippedMissing = 0;
 
         for (const op of reversed) {
             const currentFullPath = this.localFs.getFullPath(op.newPath);
             if (!fs.existsSync(currentFullPath)) {
+                skippedMissing++;
                 this.audit('warn', 'rollback-source-missing', {
                     source: op.newPath,
                     target: op.oldPath,
@@ -604,9 +655,39 @@ export class FileOperations {
                 continue;
             }
 
+            if (op.identity) {
+                if (!this.matchesFileIdentity(op.newPath, op.identity)) {
+                    const errorMsg = `Rollback aborted because "${op.newPath}" no longer refers to the renamed file.`;
+                    this.audit('error', 'rollback-identity-mismatch', {
+                        source: op.newPath,
+                        target: op.oldPath,
+                    });
+                    throw new Error(errorMsg);
+                }
+            } else {
+                this.audit('warn', 'rollback-identity-unavailable', {
+                    source: op.newPath,
+                    target: op.oldPath,
+                });
+            }
+
+            if (fs.existsSync(this.localFs.getFullPath(op.oldPath))) {
+                const errorMsg = `Rollback aborted because target path already exists: "${op.oldPath}"`;
+                this.audit('error', 'rollback-target-exists', {
+                    source: op.newPath,
+                    target: op.oldPath,
+                });
+                throw new Error(errorMsg);
+            }
+
+            validOperations.push(op);
+        }
+
+        for (const op of validOperations) {
             const result = await this.renamePaths(op.newPath, op.oldPath, {
                 action: 'rollback',
                 recordInMemory: false,
+                expectedIdentity: op.identity,
             });
             if (!result.success) {
                 throw new Error(result.error || 'Rollback failed');
@@ -614,6 +695,12 @@ export class FileOperations {
         }
 
         this.invalidateFileCache();
+        const rollbackResult = {
+            restored: validOperations.length,
+            skippedMissing,
+        };
+        this.audit('info', 'rollback-summary', rollbackResult);
+        return rollbackResult;
     }
 
     async rollback(): Promise<void> {
@@ -643,6 +730,36 @@ export class FileOperations {
 
     private invalidateFileCache() {
         this.fileCache = null;
+    }
+
+    private getFileIdentity(relPath: string): FileIdentity | undefined {
+        try {
+            const stats = fs.lstatSync(this.localFs.getFullPath(relPath));
+            return {
+                dev: Number(stats.dev),
+                ino: Number(stats.ino),
+                size: Number(stats.size),
+                mtimeMs: Number(stats.mtimeMs),
+                isDirectory: stats.isDirectory(),
+            };
+        } catch {
+            return undefined;
+        }
+    }
+
+    private matchesFileIdentity(relPath: string, expected: FileIdentity): boolean {
+        const actual = this.getFileIdentity(relPath);
+        if (!actual || actual.isDirectory !== expected.isDirectory) {
+            return false;
+        }
+
+        if (expected.ino !== 0 && actual.ino !== 0) {
+            return actual.dev === expected.dev && actual.ino === expected.ino;
+        }
+
+        // Some filesystems do not expose a stable inode. The metadata fallback
+        // is intentionally conservative and may ask the user to retry rollback.
+        return actual.size === expected.size && actual.mtimeMs === expected.mtimeMs;
     }
 
     getHiddenFiles(): TFile[] {

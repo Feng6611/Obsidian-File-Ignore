@@ -54,14 +54,17 @@ export class LocalFileSystem {
     /**
      * 递归获取所有文件和文件夹，包括隐藏文件
      */
-    getAllFiles(currentPath: string = ''): FileInfo[] {
+    getAllFiles(
+        currentPath: string = '',
+        shouldDescend?: (item: FileInfo) => boolean
+    ): FileInfo[] {
         const items = this.listDirectory(currentPath);
         let result: FileInfo[] = [...items];
 
         // 递归处理子目录
         for (const item of items) {
-            if (item.isDirectory) {
-                const subItems = this.getAllFiles(item.path);
+            if (item.isDirectory && (!shouldDescend || shouldDescend(item))) {
+                const subItems = this.getAllFiles(item.path, shouldDescend);
                 result = result.concat(subItems);
             }
         }

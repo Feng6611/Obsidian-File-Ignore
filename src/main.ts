@@ -125,7 +125,12 @@ export default class FileIgnorePlugin extends Plugin {
 
     public getRecoverableBatch(): PersistedBatchRecord | null {
         const batch = this.settings.lastBatch;
-        if (!batch || batch.completed.length === 0 || batch.status === 'rolled-back') {
+        if (
+            !batch
+            || batch.completed.length === 0
+            || batch.status === 'rolled-back'
+            || batch.status === 'rolled-back-partial'
+        ) {
             return null;
         }
         return batch;
@@ -292,7 +297,7 @@ export default class FileIgnorePlugin extends Plugin {
                 const result = await this.fileOps.executePlanItem(item, action);
                 if (result.success) {
                     changedCount++;
-                    await this.recordBatchProgress(batch, {
+                    await this.recordBatchProgress(batch, result.operation ?? {
                         oldPath: item.oldPath,
                         newPath: item.newPath,
                         timestamp: Date.now(),
@@ -353,13 +358,22 @@ export default class FileIgnorePlugin extends Plugin {
         try {
             const batch = this.getRecoverableBatch();
             if (batch && this.fileOps) {
-                await this.fileOps.rollbackBatch(batch.completed);
-                batch.status = 'rolled-back';
+                const rollbackResult = await this.fileOps.rollbackBatch(batch.completed);
+                const isPartial = rollbackResult.skippedMissing > 0;
+                batch.status = isPartial ? 'rolled-back-partial' : 'rolled-back';
                 batch.pending = [];
                 batch.updatedAt = Date.now();
+                if (isPartial) {
+                    batch.lastError = `Skipped ${rollbackResult.skippedMissing} missing item(s) during rollback.`;
+                } else {
+                    delete batch.lastError;
+                }
                 this.settings.lastBatch = batch;
                 await this.persistState(true);
-                new Notice(this.t.notice.rollbackSuccess);
+                new Notice(isPartial
+                    ? (this.t.notice.rollbackPartial?.(rollbackResult.restored, rollbackResult.skippedMissing)
+                        ?? `Rollback completed: ${rollbackResult.restored} restored, ${rollbackResult.skippedMissing} missing item(s) skipped.`)
+                    : this.t.notice.rollbackSuccess);
                 this.app.workspace.requestSaveLayout();
                 return;
             }

@@ -8,12 +8,26 @@ export const DEFAULT_RULES = [
 ].join('\n');
 
 export type BatchAction = 'hide' | 'show';
-export type BatchStatus = 'running' | 'completed' | 'rolled-back' | 'failed';
+export type BatchStatus = 'running' | 'completed' | 'rolled-back' | 'rolled-back-partial' | 'failed';
+
+export interface FileIdentity {
+    dev: number;
+    ino: number;
+    size: number;
+    mtimeMs: number;
+    isDirectory: boolean;
+}
 
 export interface FileOperation {
     oldPath: string;
     newPath: string;
     timestamp: number;
+    identity?: FileIdentity;
+}
+
+export interface RollbackResult {
+    restored: number;
+    skippedMissing: number;
 }
 
 export interface PersistedBatchRecord {

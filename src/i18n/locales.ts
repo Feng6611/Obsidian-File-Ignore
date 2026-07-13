@@ -68,6 +68,7 @@ export interface Translation {
         unknownError: string; // 新增: 通用未知错误
         rollbackSuccess: string; // 新增: 回滚成功
         rollbackError: (message: string) => string; // 新增: 回滚失败
+        rollbackPartial?: (restored: number, skipped: number) => string;
         noActionNeeded: string; // 新增: 无需操作
         rulesAppliedAndScanned?: string; // 新增：规则已应用并扫描通知
         ruleLoadedFromHistory?: string; // 新增
@@ -187,6 +188,7 @@ export const en: Translation = {
         unknownError: 'An unknown error occurred.',
         rollbackSuccess: 'Rollback successful.',
         rollbackError: (message) => `Rollback failed: ${message}`,
+        rollbackPartial: (restored, skipped) => `Rollback completed: ${restored} restored, ${skipped} missing item(s) skipped.`,
         noActionNeeded: 'No files needed to be changed based on the current rules.',
         protectedSkipped: (count) => `${count} protected item(s) skipped`,
         nestedSkipped: (count) => `${count} nested item(s) skipped because their parent directory is already planned`,
@@ -302,6 +304,7 @@ export const zhCN: Translation = {
         unknownError: '发生未知错误。',
         rollbackSuccess: '回滚成功。',
         rollbackError: (message) => `回滚失败: ${message}`,
+        rollbackPartial: (restored, skipped) => `回滚完成：已恢复 ${restored} 个项目，跳过 ${skipped} 个不存在的项目。`,
         noActionNeeded: '根据当前规则，没有文件需要更改。',
         protectedSkipped: (count) => `已跳过 ${count} 个受保护路径`,
         nestedSkipped: (count) => `已跳过 ${count} 个嵌套项目，因为其父目录已在计划中`,
@@ -417,6 +420,7 @@ export const zhTW: Translation = {
         unknownError: '發生未知錯誤。',
         rollbackSuccess: '還原成功。',
         rollbackError: (message) => `還原失敗: ${message}`,
+        rollbackPartial: (restored, skipped) => `還原完成：已恢復 ${restored} 個項目，略過 ${skipped} 個不存在的項目。`,
         noActionNeeded: '根據目前規則，沒有檔案需要變更。',
         protectedSkipped: (count) => `已跳過 ${count} 個受保護路徑`,
         nestedSkipped: (count) => `已跳過 ${count} 個巢狀項目，因為其父目錄已在計畫中`,
