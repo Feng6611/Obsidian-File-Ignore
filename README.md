@@ -1,9 +1,14 @@
 # 📁 File Ignore
 
 An Obsidian plugin that controls file indexing by managing dot prefixes (hidden attributes) on files/folders, providing a `.gitignore`-like experience.
-obsidian-file-ignore.kkuk.dev
 
-English | [简体中文](README-zh.md)
+<p>
+  <a href="https://community.obsidian.md/plugins/file-ignore"><img alt="Downloads" src="https://img.shields.io/badge/downloads-4k%2B-7c3aed?logo=obsidian&logoColor=white&style=flat-square"></a>
+  <a href="https://github.com/Feng6611/Obsidian-File-Ignore/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Feng6611/Obsidian-File-Ignore?label=release&color=7c3aed&style=flat-square"></a>
+  <a href="https://github.com/Feng6611/Obsidian-File-Ignore/releases"><img alt="Last updated" src="https://img.shields.io/github/release-date/Feng6611/Obsidian-File-Ignore?label=updated&color=7c3aed&style=flat-square"></a>
+</p>
+
+English | [简体中文](README-zh.md) · [Website](https://obsidian-file-ignore.kkuk.dev)
 
 ## Motivation
 
