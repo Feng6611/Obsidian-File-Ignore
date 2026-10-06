@@ -1,6 +1,6 @@
-# 📁 File Ignore
+# File Ignore
 
-An Obsidian plugin that controls file indexing by managing dot prefixes (hidden attributes) on files/folders, providing a `.gitignore`-like experience.
+An Obsidian plugin that controls indexing by adding or removing dot prefixes on files and folders, providing a pattern-based ignore workflow for large vaults.
 
 <p>
   <a href="https://community.obsidian.md/plugins/file-ignore"><img alt="Downloads" src="https://img.shields.io/badge/downloads-4k%2B-7c3aed?logo=obsidian&logoColor=white&style=flat-square"></a>
@@ -10,91 +10,96 @@ An Obsidian plugin that controls file indexing by managing dot prefixes (hidden 
 
 English | [简体中文](README-zh.md) · [Website](https://obsidian-file-ignore.kkuk.dev)
 
+> **File Ignore renames files and folders on disk.** Review the rename preview before applying changes.
+
 ## Motivation
 
-- I use Next.js to manage my blog, writing and publishing through Obsidian. However, `/node_modules` was a headache as Obsidian indexed everything, causing extremely slow startup.
-- Leveraging Obsidian's default behavior of not indexing "dot-prefixed hidden files", I developed this plugin to change indexing behavior by modifying file names.
-- Before using the plugin, opening the repository took about 10s; after using it, it opens almost instantly.
+I built File Ignore while using Obsidian to write in a Next.js blog repository. Indexing its `/node_modules` directory made the vault slow to open.
 
-### Related Scenarios
+Because Obsidian skips dot-prefixed hidden files and folders during indexing, File Ignore lets you toggle dot prefixes on matching paths to exclude them from indexing while keeping them on disk.
 
-When your Obsidian vault contains numerous non-note files (like code repositories, attachments, caches):
+### Common vault issues
 
-*   🐢 **Slow Startup & Performance Bottlenecks**: Obsidian tries to index all files (including `node_modules`, `.git`, large attachment folders), leading to long startup times, high RAM and CPU usage, and sluggish operations.
-*   🔍 **Cluttered Workspace**: Global search results get polluted by irrelevant content from `node_modules`, etc.; the graph view becomes crowded and hard to read due to numerous non-note files.
-*   ⚙️ **Limited Built-in Exclusion**: Obsidian's built-in "Exclude files" option often fails to truly prevent performance hits from indexing and isn't convenient to configure.
+When your vault contains code repositories, build artifacts, or large non-note directories:
+
+- **Slow startup and indexing**: Obsidian attempts to index every file, resulting in slow launch times and high resource usage.
+- **Cluttered search and graph**: Results in global search and nodes in graph view become overwhelmed with dependency files and build caches.
+- **Built-in exclusion limits**: Obsidian's native "Excluded files" setting does not always prevent indexing overhead for massive folder trees.
 
 ---
 
 ![Settings Page](setting.png)
 
-## 🚀 Features
+## Features
 
-*   **File Filtering**: Specify files or folders to ignore based on rules.
-*   **Hide Files**: Add a dot (.) prefix to matched files/folders, making them invisible to Obsidian.
-*   **Show Files**: Remove the previously added dot prefix, restoring visibility.
-*   **.gitignore-Style Patterns**: Use familiar patterns for configuration.
-*   **Index Control**: Prevent Obsidian from indexing and processing irrelevant content.
+- **Rule-based filtering**: Define path patterns to identify files and folders to ignore.
+- **Hide files**: Adds a leading dot (`.`) to matching paths, hiding them from Obsidian's index.
+- **Show files**: Removes the leading dot prefix, restoring visibility in Obsidian.
+- **Batch preview and plan**: Generates a rename plan and displays a preview before renaming paths on disk.
+- **Safety checks and recovery**: Skips protected folders, aborts on name collisions, and includes a recovery action to undo interrupted batches.
 
-## ⚙️ Usage
+## Usage
 
 ### Matching Rules
 
-Supports the following matching patterns:
+File Ignore supports basic path-matching patterns:
 
 - Specific file: `test.md`
 - Root directory file: `/readme.md`
 - Entire folder: `temp/`
 - Wildcard matching: `*test/` (e.g., `/_build/`, `/cache*/`)
 
+*Note: Patterns are simple path rules, not full `.gitignore` specifications.*
+
 ### Operations
 
-After configuring rules in the plugin settings page, you can:
+After configuring rules in the plugin settings:
 
-- Click **"Hide Files"**: Builds a rename plan, shows a preview, and then adds a "." prefix to matching files/folders.
-- Click **"Show Files"**: Builds a rename plan, shows a preview, and then removes the "." prefix from matching files/folders.
-- If a batch is interrupted, use the **Recovery** action in settings to undo the already-completed part safely.
+1. Click **"Hide Files"**: Builds a rename plan, displays a preview, and adds a `.` prefix to matching files and folders.
+2. Click **"Show Files"**: Builds a rename plan, displays a preview, and removes the `.` prefix from matching files and folders.
+3. If a batch is interrupted, click **Recovery** in settings to safely revert already-renamed files.
 
-### How to Configure?
-Configure your ignore rules in Obsidian's `Settings` -> `Community plugins` -> `File Ignore` settings page.
+### Configuration
 
-## 🛠️ Installation
+Open Obsidian and navigate to **Settings → Community plugins → File Ignore** to configure ignore rules.
 
-1.  Open `Settings` > `Community plugins` in Obsidian.
-2.  Ensure `Safe mode` is **off**.
-3.  Click `Browse community plugins`.
-4.  Search for "File Ignore".
-5.  Click `Install`.
-6.  Once installed, click `Enable`.
+## Installation
 
-## 🔍 Tips
+1. Open **Settings → Community plugins** in Obsidian.
+2. Turn **Restricted mode** off if prompted.
+3. Click **Browse**.
+4. Search for **File Ignore**.
+5. Click **Install**, then click **Enable**.
 
-Recommended to use with the [Show-Hide-Files](https://github.com/polyipseity/obsidian-show-hidden-files) plugin for better management (viewing or manipulating) of files hidden by this plugin.
+## Tips
 
-## 🔒 Safety Notes
+Pair File Ignore with the [Show-Hide-Files](https://github.com/polyipseity/obsidian-show-hidden-files) plugin if you need to view or manage dot-prefixed files directly inside Obsidian's file explorer.
 
-- **Important:** File Ignore works by renaming files and folders on disk. It is not a native Obsidian exclude API.
-- Hide/Show now builds a rename plan before execution and skips protected areas such as `.obsidian/`, `.git/`, and `.trash/` automatically.
-- When the destination name already exists (for example, both `foo.md` and `.foo.md` are present), the plugin aborts the rename and emits an audit log instead of overwriting either file.
-- Nested children are skipped when their parent directory is already scheduled for renaming, which avoids double-processing the same subtree.
-- The latest batch is persisted so interrupted runs can be undone from the settings page.
-- Each rename records a `[file-ignore][audit]` line in the developer console, making it easy to trace which paths were changed if something looks wrong.
+## Safety and Limitations
 
-## 🧪 Debugging & Troubleshooting
+- **Disk renaming**: File Ignore renames items on your filesystem. It is not an Obsidian internal filter or virtual exclude API.
+- **Protected directories**: The plugin automatically skips critical directories, including `.obsidian/`, `.git/`, and `.trash/`.
+- **Collision avoidance**: If a destination path already exists (for example, if both `foo.md` and `.foo.md` exist), the rename aborts and writes an audit log instead of overwriting existing data.
+- **Hierarchy handling**: When a parent folder is scheduled for renaming, its child items are skipped to avoid redundant operations.
+- **Undo and recovery**: The latest batch operation is saved to disk so interrupted operations can be rolled back from the settings page.
+- **Audit trail**: Every rename records a `[file-ignore][audit]` entry in the developer console.
 
-1. Open `Settings → Community plugins → File Ignore`.
-2. Enable **Debug logging** to stream detailed diagnostics.
-3. Use `View → Toggle Developer Tools` and inspect the **Console** tab; look for `[file-ignore][audit]` entries detailing hide/show batches, skipped items, and failures.
-4. Disable the toggle after finishing—normal operation stays quiet unless a warning or error occurs.
+## Debugging and Troubleshooting
 
-## 🤝 Support
+1. Open **Settings → Community plugins → File Ignore**.
+2. Turn on **Debug logging**.
+3. Open the developer console via **View → Toggle Developer Tools** and select the **Console** tab.
+4. Review `[file-ignore][audit]` entries for batch details, skipped paths, and errors.
+5. Turn off **Debug logging** when finished.
 
-If you encounter any issues or have suggestions for improvements, please visit our [GitHub repository](https://github.com/Feng6611/Obsidian-File-Ignore) to create an issue.
+## Support
 
-I'm [chenfeng](https://github.com/Feng6611) — besides Obsidian plugins I build small, permission-light Mac apps, like [Command Reopen](https://commandreopen.com), which fixes Cmd+Tab for minimized windows.
+If you encounter issues or have suggestions, please open an issue on the [GitHub repository](https://github.com/Feng6611/Obsidian-File-Ignore).
 
-You can also support me by buying me a coffee: [Buy Me A Coffee](https://buymeacoffee.com/kkuk)
+Built by [chenfeng](https://github.com/Feng6611). Alongside Obsidian plugins, I develop focused Mac utilities, including [Command Reopen](https://commandreopen.com), which restores minimized windows on Cmd+Tab.
 
-## 📄 License
+You can also support development on [Buy Me A Coffee](https://buymeacoffee.com/kkuk).
 
-This project is open-sourced under the MIT License - see the [LICENSE](LICENSE) file for details.
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
