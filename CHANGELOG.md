@@ -1,7 +1,8 @@
 # Changelog
 
-## 1.1.3
+## 1.1.4
 
+- Update build dependencies and add an advisory-aware dependency audit to the release gate.
 - Protect the vault's configured settings directory when hiding files.
 - Use Obsidian's bundled language support and safe DOM helpers in settings.
 - Fix translated rename confirmations and closing a confirmation without applying changes.

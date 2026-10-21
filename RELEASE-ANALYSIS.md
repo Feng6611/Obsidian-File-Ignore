@@ -24,7 +24,7 @@ a successful GitHub release alone does not prove directory reinstatement.
 
 | Area | Evidence and disposition |
 | --- | --- |
-| Release delivery | 1.1.2 exists only as a draft. The old tag workflow always created drafts and did not validate downloadable artifacts. 1.1.3 adds checked draft-to-public publication and public SHA-256 readback. |
+| Release delivery | 1.1.2 exists only as a draft. The old tag workflow always created drafts and did not validate downloadable artifacts. 1.1.4 adds checked draft-to-public publication and public SHA-256 readback. |
 | Official code warnings | Replaced direct DOM HTML with `setIcon`, HTML settings headings with `Setting`, direct Moment import with the bundled export, explicit `any` with narrowed types, and unhandled preview/open promises with rejection handlers. Manifest now has supported fields and punctuation. Removed unused build dependencies. |
 | Confirmation | The old modal injected translations through `any` and never resolved its Promise when dismissed. Translation capture and `onClose` now cover this case; tests cover dismiss and Proceed. |
 | Configuration directory | Hardcoded config protection did not honor a custom vault configuration directory. Use `Vault.configDir` and protect its children and ancestors from renaming while still scanning ordinary sibling folders. |
@@ -41,7 +41,7 @@ a successful GitHub release alone does not prove directory reinstatement.
 ## Release gate
 
 `npm run release:check` runs official ESLint, the official Manifest rule, official
-Stylelint configuration for plugin CSS, TypeScript, eight regression checks,
+Stylelint configuration for plugin CSS, TypeScript, nine regression checks,
 production build, bundle export loading, versions, changelog and required assets.
 Warnings fail the gate. `npm run release:tag` reruns the gate and requires a clean
 working tree before creating the version tag. CI repeats it on Linux, macOS and
@@ -55,3 +55,15 @@ Local tests mock the Obsidian API and use disposable temporary files. They do no
 prove the actual desktop UI or automatic directory reinstatement. Latest-batch-only
 recovery remains an existing limitation. Runtime dependency audit on this date
 reported zero known vulnerabilities.
+
+## Dependency audit
+
+The 1.1.3 tag was retained, but its release workflow was cancelled before creating
+a release. GitHub identified the esbuild Windows development-server advisory.
+1.1.4 updates esbuild to 0.28.1 and overrides the development-only Moment package
+to 2.31.0. Full audit also reports unpatched braces advisory
+GHSA-vfj7-8cjw-p6xm through the official CSS checker. This one advisory is
+explicitly accepted only for dev dependencies, where glob patterns are controlled
+by this repository; braces is not shipped in the plugin bundle. All runtime
+advisories and any new advisory fail the gate. The exception fails if npm reports
+a fix available, so it must be revisited when a patch ships.

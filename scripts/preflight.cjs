@@ -16,7 +16,7 @@ assert.ok(existsSync('package-lock.json'), 'Commit package-lock.json for reprodu
 assert.equal(read('package-lock.json').packages[''].version, pkg.version);
 assert.ok(readFileSync('CHANGELOG.md', 'utf8').includes(`## ${manifest.version}\n`), 'Missing release notes');
 if (process.env.GITHUB_REF_TYPE === 'tag') assert.equal(process.env.GITHUB_REF_NAME, manifest.version, 'Tag must equal manifest version (no v prefix)');
-for (const name of ['lint', 'lint:css', 'typecheck', 'test', 'build']) {
+for (const name of ['audit', 'lint', 'lint:css', 'typecheck', 'test', 'build']) {
     const result = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', name], { stdio: 'inherit', shell: process.platform === 'win32' });
     if (result.status !== 0) process.exit(result.status || 1);
 }

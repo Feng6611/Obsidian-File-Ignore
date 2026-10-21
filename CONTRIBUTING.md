@@ -6,7 +6,9 @@ Run `npm run release:check` before committing a release. It runs the official
 [Obsidian ESLint rules](https://github.com/obsidianmd/eslint-plugin), the official
 [Obsidian Stylelint configuration](https://github.com/obsidianmd/stylelint-config),
 TypeScript, filesystem regression tests, production bundling, and bundle loading.
-Warnings fail the check. Manifest validation uses the official manifest rule.
+Warnings fail the check. The full dependency audit blocks new advisories and all
+runtime advisories. See `scripts/audit-dependencies.cjs` for the one documented,
+unpatched development-only exception. Manifest validation uses the official manifest rule.
 
 The settings search suggestion is disabled because the custom preview UI supports
 Obsidian 1.8.7 and the declarative settings API requires 1.13. No other recommended
