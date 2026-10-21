@@ -1,9 +1,8 @@
-import { App, Notice, Plugin, TFile, TFolder } from 'obsidian';
+import { Notice, Plugin, TFile, TFolder, moment } from 'obsidian';
 import { FileOperations, type RenamePlan } from './fileOperations';
 import { FileIgnoreSettingTab } from './settings';
 import { LocalFileSystem, FileInfo } from './localFileSystem';
 import { locales, type Translation } from './i18n/locales';
-import moment from 'moment';
 import {
     DEFAULT_SETTINGS,
     type BatchAction,
@@ -28,8 +27,8 @@ export default class FileIgnorePlugin extends Plugin {
 
         if (obsidianLang.startsWith('zh')) {
             langKey = (obsidianLang === 'zh-tw' || obsidianLang === 'zh-hk') ? 'zh-TW' : 'zh-CN';
-        } else if (locales.hasOwnProperty(obsidianLang)) {
-            langKey = obsidianLang as keyof typeof locales;
+        } else if (Object.prototype.hasOwnProperty.call(locales, obsidianLang)) {
+            langKey = obsidianLang;
         }
         this.t = locales[langKey];
 
@@ -88,7 +87,8 @@ export default class FileIgnorePlugin extends Plugin {
     }
 
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        const saved: unknown = await this.loadData();
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, saved as Partial<FileIgnoreSettings> | null);
         this.settings.rulesHistory = Array.isArray(this.settings.rulesHistory) ? this.settings.rulesHistory : [];
         this.settings.ignoredFiles = Array.isArray(this.settings.ignoredFiles) ? this.settings.ignoredFiles : [];
         this.settings.lastBatch = this.settings.lastBatch ?? null;
@@ -270,7 +270,7 @@ export default class FileIgnorePlugin extends Plugin {
 
             if (plan.items.length === 0) {
                 new Notice(this.t.notice.noActionNeeded);
-                console.info('[file-ignore][audit]', 'batch-summary', {
+                console.debug('[file-ignore][audit]', 'batch-summary', {
                     action: hide ? 'hide' : 'show',
                     totalMatched: filesToProcess.length,
                     planned: 0,
@@ -313,7 +313,7 @@ export default class FileIgnorePlugin extends Plugin {
 
                 processedCount++;
                 if (processedCount % 25 === 0) {
-                    await new Promise(resolve => setTimeout(resolve, 0));
+                    await new Promise(resolve => window.setTimeout(resolve, 0));
                 }
             }
 
@@ -335,7 +335,7 @@ export default class FileIgnorePlugin extends Plugin {
                 );
             }
 
-            console.info('[file-ignore][audit]', 'batch-summary', {
+            console.debug('[file-ignore][audit]', 'batch-summary', {
                 action,
                 totalMatched: filesToProcess.length,
                 planned: plan.items.length,
@@ -348,9 +348,9 @@ export default class FileIgnorePlugin extends Plugin {
                 batchId: batch.id,
                 status: batch.status,
             });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[file-ignore] Error in applyRules:', error);
-            new Notice(this.t.notice.applyError(error.message));
+            new Notice(this.t.notice.applyError(error instanceof Error ? error.message : String(error)));
         }
     }
 
@@ -381,9 +381,9 @@ export default class FileIgnorePlugin extends Plugin {
             await this.fileOps?.rollback();
             new Notice(this.t.notice.rollbackSuccess);
             this.app.workspace.requestSaveLayout();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[file-ignore] Rollback operation failed:', error);
-            new Notice(this.t.notice.rollbackError(error.message || this.t.notice.unknownError));
+            new Notice(this.t.notice.rollbackError(error instanceof Error ? error.message : this.t.notice.unknownError));
         }
     }
 }

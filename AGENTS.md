@@ -18,7 +18,8 @@
 - Apply `camelCase` for variables/functions, `PascalCase` for classes, and file names in `camelCase`. Mirror existing patterns when extending modules.
 
 ## Testing Guidelines
-- No automated tests; validate manually in an Obsidian dev vault.
+- Run `npm run release:check` before release commits; use `npm run release:tag` to check again before creating the tag. See `CONTRIBUTING.md`.
+- Automated tests cover rename safety and modal confirmation; also validate manually in a disposable Obsidian dev vault.
 - Copy or symlink `manifest.json`, `main.js`, and `styles.css` into `.obsidian/plugins/file-ignore/`, then reload plugins.
 - In Obsidian, configure rules via Settings → Community plugins → File Ignore, run “Apply Ignore Rules”, toggle dot-prefix commands, and confirm rename rollback on disposable files.
 

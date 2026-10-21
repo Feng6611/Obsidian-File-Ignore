@@ -1,4 +1,4 @@
-import { App, ButtonComponent, Modal, Notice, PluginSettingTab, Setting, TextAreaComponent, debounce } from 'obsidian';
+import { App, ButtonComponent, Modal, Notice, PluginSettingTab, Setting, TextAreaComponent, debounce, setIcon } from 'obsidian';
 import type FileIgnorePlugin from './main';
 import type { RenamePlan } from './fileOperations';
 import type { Translation } from './i18n/locales';
@@ -22,7 +22,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
 
         this.debouncedUpdateMatchedFiles = debounce(
             () => {
-                this.updateDisplayAsync();
+                this.updateDisplayAsync().catch(error => console.error('[file-ignore] Preview failed:', error));
             },
             1500
         );
@@ -39,7 +39,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
     }, 500, false);
 
     debouncedUpdateDisplay = debounce(() => {
-        this.updateDisplayAsync();
+        this.updateDisplayAsync().catch(error => console.error('[file-ignore] Preview failed:', error));
     }, 600, false);
 
     private async updateDisplayAsync() {
@@ -125,7 +125,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         const history = this.plugin.settings.rulesHistory || [];
         const historyLength = history.length;
 
-        if (this.prevAppliedRuleButton) {
+        if (this.prevAppliedRuleButton !== undefined) {
             if (historyLength === 0) {
                 this.prevAppliedRuleButton.setDisabled(true);
             } else if (this.appliedRulesHistoryIndex === -1) {
@@ -134,7 +134,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
                 this.prevAppliedRuleButton.setDisabled(this.appliedRulesHistoryIndex === 0);
             }
         }
-        if (this.nextAppliedRuleButton) {
+        if (this.nextAppliedRuleButton !== undefined) {
             if (historyLength === 0) {
                 this.nextAppliedRuleButton.setDisabled(true);
             } else if (this.appliedRulesHistoryIndex === -1) {
@@ -201,16 +201,20 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
                 .setCta()
                 .onClick(async () => {
                     await this.plugin.rollback();
-                    await this.display();
+                    await this.render();
                     await this.updateDisplayAsync();
                 }));
     }
 
-    async display(): Promise<void> {
+    display(): void {
+        this.render().catch(error => console.error('[file-ignore] Settings failed:', error));
+    }
+
+    private async render(): Promise<void> {
         const { containerEl } = this;
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: this.t.settingsTitle, cls: 'file-ignore-settings-title' });
+        new Setting(containerEl).setName(this.t.settingsTitle).setHeading();
 
         const initialPluginRules = this.plugin.settings.rules;
         await this.plugin.saveSettings(initialPluginRules, true);
@@ -238,7 +242,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
                     return;
                 }
                 await this.plugin.applyRules(true, { matches: matched, plan });
-                await this.display();
+                await this.render();
                 await this.updateDisplayAsync();
             });
 
@@ -259,7 +263,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
                     return;
                 }
                 await this.plugin.applyRules(false, { matches: matched, plan });
-                await this.display();
+                await this.render();
                 await this.updateDisplayAsync();
             });
 
@@ -346,7 +350,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         const filesListContainer = matchedFilesContainer.createDiv('file-ignore-matched-files-list-container');
         this.showLoading(filesListContainer);
 
-        this.updateDisplayAsync();
+        this.updateDisplayAsync().catch(error => console.error('[file-ignore] Preview failed:', error));
 
         if (this.t.support) {
             const support = this.t.support;
@@ -356,7 +360,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
                 .addButton(button => button
                     .setButtonText(support.button)
                     .onClick(() => {
-                        window.open('https://buymeacoffee.com/RDzWpfRwLU', '_blank');
+                        window.open('https://buymeacoffee.com/kkuk', '_blank');
                     }));
             supportSetting.controlEl.addClass('file-ignore-support-button-container');
         }
@@ -370,14 +374,14 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
                     this.plugin.settings.debug = value;
                     this.plugin.fileOps?.setDebug(value);
                     await this.plugin.saveSettings(undefined);
-                    console.info('[file-ignore][audit]', value ? 'debug-enabled' : 'debug-disabled');
+                    console.debug('[file-ignore][audit]', value ? 'debug-enabled' : 'debug-disabled');
                 });
             });
     }
 
     private showLoading(container: HTMLElement) {
         container.empty();
-        container.createEl('div', { text: this.t.notice.loading, cls: 'setting-item-description file-ignore-loading' });
+        container.createDiv({ text: this.t.notice.loading, cls: 'setting-item-description file-ignore-loading' });
     }
 
     private renderMatchedFilesList(container: HTMLElement, matchedFiles: FileInfo[] | null, hiddenCount: number | null, error: Error | null) {
@@ -387,7 +391,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
             return;
         }
         if (matchedFiles === null || hiddenCount === null) {
-            container.createEl('div', { text: this.t.notice.loading, cls: 'setting-item-description file-ignore-loading' });
+            container.createDiv({ text: this.t.notice.loading, cls: 'setting-item-description file-ignore-loading' });
             return;
         }
 
@@ -432,7 +436,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
                 if (isFolder) {
                     new Notice(`Folder: ${file.path}`);
                 } else {
-                    this.app.workspace.openLinkText(file.path, '');
+                    this.app.workspace.openLinkText(file.path, '').catch(error => console.error('[file-ignore] Open failed:', error));
                 }
             });
         });
@@ -452,20 +456,22 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
             ? (this.t.confirm?.conflictWarning?.(plan.skippedConflicts) ?? `${plan.skippedConflicts} item(s) will be skipped because the target path already exists or conflicts with another rename.`)
             : '';
 
+        const translations = this.t;
         return await new Promise<boolean>((resolve) => {
             const modal = new class extends Modal {
                 constructor(app: App) { super(app); }
+                onClose() { resolve(false); }
                 onOpen() {
                     const { contentEl } = this;
                     contentEl.empty();
-                    contentEl.createEl('h3', { text: title });
+                    new Setting(contentEl).setName(title).setHeading();
                     contentEl.createEl('p', { text: summary });
                     if (protectedWarning) contentEl.createEl('p', { text: protectedWarning, cls: 'mod-warning' });
                     if (nestedWarning) contentEl.createEl('p', { text: nestedWarning, cls: 'mod-warning' });
                     if (conflictWarning) contentEl.createEl('p', { text: conflictWarning, cls: 'mod-warning' });
 
                     if (plan.items.length > 0) {
-                        contentEl.createEl('h4', { text: (this as any).t?.confirm?.previewTitle || 'Planned renames' });
+                        new Setting(contentEl).setName(translations.confirm?.previewTitle || 'Planned renames').setHeading();
                         const previewList = contentEl.createEl('ul');
                         const previewItems = plan.items.slice(0, 5);
                         previewItems.forEach(item => {
@@ -473,7 +479,7 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
                         });
                         if (plan.items.length > previewItems.length) {
                             contentEl.createEl('p', {
-                                text: (this as any).t?.confirm?.previewMore?.(plan.items.length - previewItems.length)
+                                text: translations?.confirm?.previewMore?.(plan.items.length - previewItems.length)
                                     || `…and ${plan.items.length - previewItems.length} more.`
                             });
                         }
@@ -481,15 +487,14 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
 
                     const btns = contentEl.createDiv({ cls: 'modal-button-container' });
                     new ButtonComponent(btns)
-                        .setButtonText((this as any).t?.confirm?.proceed || 'Proceed')
+                        .setButtonText(translations?.confirm?.proceed || 'Proceed')
                         .setCta()
-                        .onClick(() => { this.close(); resolve(true); });
+                        .onClick(() => { resolve(true); this.close(); });
                     new ButtonComponent(btns)
-                        .setButtonText((this as any).t?.confirm?.cancel || 'Cancel')
+                        .setButtonText(translations?.confirm?.cancel || 'Cancel')
                         .onClick(() => { this.close(); resolve(false); });
                 }
             }(this.app);
-            (modal as any).t = this.t;
             modal.open();
         });
     }
@@ -501,11 +506,11 @@ export class FileIgnoreSettingTab extends PluginSettingTab {
         const textContainer = statusEl.createSpan('file-ignore-status-text');
 
         if (error) {
-            iconContainer.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+            setIcon(iconContainer, 'circle-alert');
             textContainer.setText(`Error: ${error.message}`);
             statusEl.addClass('mod-error');
         } else {
-            iconContainer.innerHTML = '<svg viewBox="0 0 24 24" fill="none" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
+            setIcon(iconContainer, 'info');
             textContainer.setText(this.t.settingsHeaderInfo || 'Click Hide/Show buttons to apply rules.');
         }
     }

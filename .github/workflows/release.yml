@@ -2,53 +2,62 @@ name: Release Obsidian plugin
 
 on:
   push:
-    tags:
-      - "*"
+    branches: [main]
+    tags: ['*']
+  pull_request:
 
-env:
-  PLUGIN_NAME: file-ignore
+permissions:
+  contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-22.04
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run release:check
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: check
+    runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          fetch-depth: 0
-
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "18.x"
-
-      - name: Build plugin
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run release:check
+      - name: Prepare release notes and checksums
         run: |
-          npm install
-          npm run build
-
-      - name: Create release
+          node scripts/release-notes.cjs > release-notes.md
+          sha256sum main.js manifest.json styles.css > SHA256SUMS.txt
+      - uses: actions/attest@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
+      - name: Create and verify draft, publish, verify public downloads
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          tag="${GITHUB_REF#refs/tags/}"
-          
-          # 检查版本号是否匹配
-          manifest_version=$(cat manifest.json | jq -r '.version')
-          
-          if [ "$tag" != "$manifest_version" ]; then
-            echo "Error: Tag version ($tag) does not match manifest.json version ($manifest_version)"
-            exit 1
-          fi
-          
-          # 创建发布包
-          mkdir ${{ env.PLUGIN_NAME }}
-          cp main.js manifest.json styles.css versions.json ${{ env.PLUGIN_NAME }}
-          zip -r ${{ env.PLUGIN_NAME }}.zip ${{ env.PLUGIN_NAME }}
-          
-          gh release create "$tag" \
-            --title="$tag" \
-            --draft \
-            --notes "Release $tag" \
-            main.js manifest.json styles.css versions.json "${{ env.PLUGIN_NAME }}.zip" 
+          gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TAG" --notes-file release-notes.md main.js manifest.json styles.css SHA256SUMS.txt
+          node scripts/verify-release.cjs --draft
+          gh release edit "$RELEASE_TAG" --draft=false --latest
+          npm run release:verify

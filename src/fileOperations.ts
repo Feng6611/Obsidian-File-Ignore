@@ -55,7 +55,6 @@ export class FileOperations {
     private fileCache: { items: FileInfo[]; timestamp: number; key: string } | null = null;
     private static CACHE_TTL = 2000;
     private static PROTECTED_PREFIXES = [
-        '.obsidian',
         '.git',
         '.trash',
     ];
@@ -70,13 +69,13 @@ export class FileOperations {
         this.DEBUG = enabled;
     }
 
-    private debug(...args: any[]) {
+    private debug(...args: unknown[]) {
         if (this.DEBUG) {
             console.debug('[file-ignore]', ...args);
         }
     }
 
-    private audit(level: 'info' | 'warn' | 'error', message: string, context?: Record<string, any>) {
+    private audit(level: 'info' | 'warn' | 'error', message: string, context?: Record<string, unknown>) {
         const payload = context ? ['[file-ignore][audit]', message, context] : ['[file-ignore][audit]', message];
         switch (level) {
             case 'warn':
@@ -86,7 +85,7 @@ export class FileOperations {
                 console.error(...payload);
                 break;
             default:
-                console.info(...payload);
+                this.debug(...payload);
                 break;
         }
     }
@@ -130,8 +129,14 @@ export class FileOperations {
     }
 
     private shouldDescendIntoDirectory(fileInfo: FileInfo, rules: Rule[]): boolean {
-        if (this.isProtectedPath(fileInfo.path)) {
+        if (this.isProtectedPath(fileInfo.path, false)) {
             return false;
+        }
+
+        // This ancestor cannot be renamed, so scan its ordinary siblings even
+        // when a broad rule matches the ancestor itself.
+        if (this.normalizePath(this.vault.configDir).startsWith(`${this.normalizePath(fileInfo.path)}/`)) {
+            return true;
         }
 
         const positiveRuleMatches = rules.some(rule => !rule.negate && this.matchesRule(fileInfo, rule));
@@ -145,8 +150,10 @@ export class FileOperations {
         return rules.some(rule => rule.negate);
     }
 
-    public isProtectedPath(relPath: string): boolean {
+    public isProtectedPath(relPath: string, includeAncestors: boolean = true): boolean {
         const normalized = this.normalizePath(relPath);
+        const configDir = this.normalizePath(this.vault.configDir);
+        if (normalized === configDir || normalized.startsWith(`${configDir}/`) || (includeAncestors && configDir.startsWith(`${normalized}/`))) return true;
         return normalized
             .split('/')
             .filter(Boolean)
@@ -601,14 +608,14 @@ export class FileOperations {
                 target: vaultNewPath
             });
             return { success: true, changed: true, operation };
-        } catch (error: any) {
-            const errorMsg = `Error renaming "${vaultCurrentPath}" to "${vaultNewPath}": ${error.message}`;
+        } catch (error: unknown) {
+            const errorMsg = `Error renaming "${vaultCurrentPath}" to "${vaultNewPath}": ${error instanceof Error ? error.message : String(error)}`;
             this.debug(errorMsg, error);
             this.audit('error', 'rename-failed', {
                 operation: context.action,
                 source: vaultCurrentPath,
                 target: vaultNewPath,
-                message: error?.message ?? String(error)
+                message: error instanceof Error ? error.message : String(error)
             });
             return { success: false, changed: false, error: errorMsg };
         }

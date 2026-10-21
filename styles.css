@@ -49,7 +49,7 @@
     padding: 8px 12px; /* 减少垂直内边距 */
     background-color: var(--background-secondary);
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
     position: sticky; /* Make it stick to top */
     top: 0;
     z-index: 10; /* Ensure it appears above other elements */
@@ -97,6 +97,7 @@
     from {
         transform: rotate(0deg);
     }
+
     to {
         transform: rotate(360deg);
     }
@@ -108,7 +109,9 @@
 }
 
 /* 设置页面样式 */
+
 /* 旧的主容器 */
+
 /*
 .file-ignore-main-container {
     display: flex;
